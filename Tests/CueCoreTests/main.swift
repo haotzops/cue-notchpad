@@ -1,0 +1,109 @@
+import CoreGraphics
+import CueCore
+import Darwin
+import Foundation
+
+private var failureCount = 0
+
+private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
+    if !condition() {
+        failureCount += 1
+        FileHandle.standardError.write(Data("FAIL: \(message)\n".utf8))
+    }
+}
+
+do {
+    let arguments = try CueArguments(arguments: ["--wait"])
+    expect(arguments.waitsForEditing, "--wait should enable waiting")
+} catch {
+    expect(false, "--wait should parse: \(error)")
+}
+
+for arguments in [[], ["-w"], ["--wait", "file.txt"], ["--help"]] {
+    do {
+        _ = try CueArguments(arguments: arguments)
+        expect(false, "unexpectedly accepted \(arguments)")
+    } catch is CueArgumentError {
+        // Expected.
+    } catch {
+        expect(false, "unexpected parser error: \(error)")
+    }
+}
+
+let notchedLayout = NotchLayout(screen: NotchScreenGeometry(
+    screenWidth: 1512,
+    safeAreaTop: 32,
+    menuBarHeight: 32,
+    leftAuxiliaryWidth: 664,
+    rightAuxiliaryWidth: 664
+))
+expect(notchedLayout.closedSize == CGSize(width: 188, height: 32), "physical notch measurement")
+expect(notchedLayout.openSize == CGSize(width: 680, height: 292), "standard open size")
+expect(notchedLayout.contentTopInset == 32, "physical notch content inset")
+
+let plainLayout = NotchLayout(screen: NotchScreenGeometry(
+    screenWidth: 1920,
+    safeAreaTop: 0,
+    menuBarHeight: 25
+))
+expect(plainLayout.closedSize == CGSize(width: 185, height: 28), "display fallback size")
+expect(plainLayout.contentTopInset == 28, "minimum content inset")
+
+let narrowLayout = NotchLayout(screen: NotchScreenGeometry(
+    screenWidth: 390,
+    safeAreaTop: 30,
+    menuBarHeight: 30
+))
+expect(narrowLayout.openSize.width == 360, "narrow display width")
+
+let customLayout = NotchLayout(
+    screen: NotchScreenGeometry(screenWidth: 1512, safeAreaTop: 32, menuBarHeight: 32),
+    preferredOpenWidth: 800,
+    preferredOpenHeight: 400
+)
+expect(customLayout.openSize == CGSize(width: 800, height: 400), "custom open size")
+
+expect(
+    CueLocalization.string(.promptPlaceholder, fallback: "missing", localization: "en")
+        == "Write a prompt…",
+    "English prompt localization"
+)
+expect(
+    CueLocalization.string(.actionDone, fallback: "missing", localization: "zh-Hans")
+        == "完成",
+    "Simplified Chinese action localization"
+)
+expect(
+    CueLocalization.string(.promptLabel, fallback: "missing", localization: "zh-Hans")
+        == "PROMPT",
+    "Simplified Chinese prompt label"
+)
+expect(
+    CueLocalization.characterCount(1, localization: "en") == "characters: 1",
+    "English character count"
+)
+expect(
+    CueLocalization.characterCount(3, localization: "zh-Hans") == "字符: 3",
+    "Simplified Chinese character count"
+)
+expect(
+    CueLocalization.tokenCount(7, localization: "en") == "token: 7"
+        && CueLocalization.tokenCount(7, localization: "zh-Hans") == "token: 7",
+    "language-independent token label"
+)
+
+let tokenCounter = CueTokenCounter.shared
+expect(tokenCounter.count("") == 0, "empty token count")
+expect(tokenCounter.count("hello world") == 2, "basic cl100k token count")
+expect(tokenCounter.count("Hello, world!") == 4, "punctuated cl100k token count")
+expect(
+    tokenCounter.count("The quick brown fox jumps over the lazy dog") == 9,
+    "sentence cl100k token count"
+)
+
+if failureCount == 0 {
+    print("All CueCore tests passed")
+    exit(EXIT_SUCCESS)
+}
+
+exit(EXIT_FAILURE)
