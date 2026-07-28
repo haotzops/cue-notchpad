@@ -8,11 +8,13 @@ APP="$OUTPUT_DIR/Cue Notepad.app"
 
 cd "$ROOT"
 swift build -c "$CONFIGURATION" --product cue
+swift build -c "$CONFIGURATION" --product cue-host
 BIN_DIR="$(swift build -c "$CONFIGURATION" --show-bin-path)"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/cue" "$APP/Contents/MacOS/cue"
+cp "$BIN_DIR/cue-host" "$APP/Contents/MacOS/cue-host"
 cp "$ROOT/Supporting/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Supporting/ThirdPartyNotices.txt" "$APP/Contents/Resources/"
 
@@ -30,7 +32,7 @@ for resource_bundle in "$BIN_DIR"/CueNotepad_*.bundle; do
 done
 shopt -u nullglob
 
-chmod +x "$APP/Contents/MacOS/cue"
+chmod +x "$APP/Contents/MacOS/cue" "$APP/Contents/MacOS/cue-host"
 
 # An ad-hoc signature avoids the "bundle format is ambiguous" warning and is
 # sufficient for local builds. A release identity can be supplied by setting

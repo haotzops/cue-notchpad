@@ -32,8 +32,8 @@ public struct NotchLayout: Equatable, Sendable {
 
     public init(
         screen: NotchScreenGeometry,
-        preferredOpenWidth: CGFloat = 680,
-        preferredOpenHeight: CGFloat = 292
+        preferredOpenWidth: CGFloat = 650,
+        preferredOpenHeight: CGFloat = 150
     ) {
         let measuredNotchWidth: CGFloat? = {
             guard let left = screen.leftAuxiliaryWidth,
@@ -52,7 +52,7 @@ public struct NotchLayout: Equatable, Sendable {
         )
         self.openSize = CGSize(
             width: min(max(420, preferredOpenWidth), min(1_200, maximumOpenWidth)),
-            height: min(max(220, preferredOpenHeight), 800)
+            height: min(max(130, preferredOpenHeight), 800)
         )
         self.contentTopInset = topInset
     }

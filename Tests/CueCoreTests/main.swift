@@ -19,7 +19,16 @@ do {
     expect(false, "--wait should parse: \(error)")
 }
 
-for arguments in [[], ["-w"], ["--wait", "file.txt"], ["--help"]] {
+do {
+    let waitFile = try CueArguments(arguments: ["--wait", "prompt.md"])
+    let editorFile = try CueArguments(arguments: ["prompt.md"])
+    let dashFile = try CueArguments(arguments: ["--wait", "--", "-prompt.md"])
+    expect(waitFile.filePath == "prompt.md", "--wait file should parse")
+    expect(editorFile.filePath == "prompt.md", "$EDITOR file form should parse")
+    expect(dashFile.filePath == "-prompt.md", "-- should accept dash path")
+} catch { expect(false, "file argument should parse: \(error)") }
+
+for arguments in [[], ["-w"], ["--wait", "a", "b"], ["--help"], ["-file.txt"]] {
     do {
         _ = try CueArguments(arguments: arguments)
         expect(false, "unexpectedly accepted \(arguments)")
@@ -38,7 +47,7 @@ let notchedLayout = NotchLayout(screen: NotchScreenGeometry(
     rightAuxiliaryWidth: 664
 ))
 expect(notchedLayout.closedSize == CGSize(width: 188, height: 32), "physical notch measurement")
-expect(notchedLayout.openSize == CGSize(width: 680, height: 292), "standard open size")
+expect(notchedLayout.openSize == CGSize(width: 650, height: 150), "standard open size")
 expect(notchedLayout.contentTopInset == 32, "physical notch content inset")
 
 let plainLayout = NotchLayout(screen: NotchScreenGeometry(
@@ -62,6 +71,12 @@ let customLayout = NotchLayout(
     preferredOpenHeight: 400
 )
 expect(customLayout.openSize == CGSize(width: 800, height: 400), "custom open size")
+
+let minimumHeightLayout = NotchLayout(
+    screen: NotchScreenGeometry(screenWidth: 1512, safeAreaTop: 32, menuBarHeight: 32),
+    preferredOpenHeight: 130
+)
+expect(minimumHeightLayout.openSize.height == 130, "minimum height")
 
 expect(
     CueLocalization.string(.promptPlaceholder, fallback: "missing", localization: "en")

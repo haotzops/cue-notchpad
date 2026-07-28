@@ -14,29 +14,24 @@ enum CueOutcome: Equatable {
 }
 
 final class PromptWindowController: NSWindowController {
-    private let model: PromptModel
+    private let presentation: PromptPresentation
     private let settings: CueSettings
     private let targetScreen: NSScreen
     private let screenGeometry: NotchScreenGeometry
-    private let completion: (CueOutcome) -> Void
+    private var completion: (CueOutcome) -> Void
     private weak var editor: NSTextView?
     private var settingsWindowController: SettingsWindowController?
-    private var statusItem: NSStatusItem?
     private var settingsObservation: AnyCancellable?
+    private var contentHeightObservation: AnyCancellable?
+    private var layoutUpdateWorkItem: DispatchWorkItem?
     private var didFinish = false
 
-    private var layout: NotchLayout {
-        NotchLayout(
-            screen: screenGeometry,
-            preferredOpenWidth: settings.normalizedWidth,
-            preferredOpenHeight: settings.normalizedHeight
-        )
-    }
-
     init(
-        initialText: String,
+        model: PromptModel,
+        sessionID: UUID,
         settings: CueSettings,
         screen: NSScreen,
+        sourceName: String?,
         completion: @escaping (CueOutcome) -> Void
     ) {
         let screenGeometry = Self.geometry(for: screen)
@@ -46,7 +41,7 @@ final class PromptWindowController: NSWindowController {
             preferredOpenHeight: settings.normalizedHeight
         )
 
-        self.model = PromptModel(text: initialText)
+        self.presentation = PromptPresentation(model: model, sourceName: sourceName, sessionID: sessionID)
         self.settings = settings
         self.targetScreen = screen
         self.screenGeometry = screenGeometry
@@ -68,7 +63,7 @@ final class PromptWindowController: NSWindowController {
 
         panel.contentView = NSHostingView(
             rootView: PromptView(
-                model: model,
+                presentation: presentation,
                 settings: settings,
                 screenGeometry: screenGeometry,
                 onSubmit: { [weak self] in self?.submit() },
@@ -83,8 +78,9 @@ final class PromptWindowController: NSWindowController {
         )
 
         settingsObservation = settings.objectWillChange.sink { [weak self] in
-            DispatchQueue.main.async { self?.applySettings() }
+            self?.scheduleLayoutUpdate()
         }
+        observeContentHeight(for: model)
     }
 
     @available(*, unavailable)
@@ -101,14 +97,47 @@ final class PromptWindowController: NSWindowController {
             y: frame.maxY - panel.frame.height
         ))
         panel.alphaValue = 1
+        presentation.isExpanded = true
         applySettings()
-        panel.orderFrontRegardless()
-        panel.makeKey()
         NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self, let editor = self.editor else { return }
+            self.window?.makeFirstResponder(editor)
+        }
+    }
+
+    var currentText: String { presentation.model.text }
+
+    func configureSession(
+        model: PromptModel,
+        sessionID: UUID,
+        sourceName: String?,
+        index: Int,
+        count: Int,
+        direction: Int,
+        previous: @escaping () -> Void,
+        next: @escaping () -> Void,
+        completion: @escaping (CueOutcome) -> Void
+    ) {
+        self.completion = completion
+        self.didFinish = false
+        observeContentHeight(for: model)
+        presentation.switchSession(
+            model: model,
+            sourceName: sourceName,
+            sessionID: sessionID,
+            index: index,
+            count: count,
+            direction: direction,
+            previous: previous,
+            next: next
+        )
+        show()
     }
 
     func submit() {
-        finish(with: .submitted(model.text))
+        finish(with: .submitted(presentation.model.text))
     }
 
     @objc func cancel() {
@@ -116,35 +145,27 @@ final class PromptWindowController: NSWindowController {
     }
 
     @objc func hideTemporarily() {
-        guard !didFinish, statusItem == nil else { return }
+        guard !didFinish else { return }
         settingsWindowController?.close()
-        model.isExpanded = false
+        presentation.isExpanded = false
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { [weak self] in
             guard let self, !self.didFinish else { return }
             self.window?.orderOut(nil)
-            self.installStatusItem()
         }
     }
 
-    @objc func showFromStatusItem() {
+    @objc func showAfterHiding() {
         guard !didFinish else { return }
-        removeStatusItem()
-        model.isExpanded = false
+        presentation.isExpanded = true
         show()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in
-            guard let self else { return }
-            self.model.isExpanded = true
-            if let editor = self.editor {
-                self.window?.makeFirstResponder(editor)
-            }
-        }
     }
 
     @objc func openSettings() {
         if settingsWindowController == nil {
             settingsWindowController = SettingsWindowController(
                 settings: settings,
+                screen: targetScreen,
                 onClose: { [weak self] in
                     guard let self, !self.didFinish else { return }
                     self.window?.makeKeyAndOrderFront(nil)
@@ -157,64 +178,57 @@ final class PromptWindowController: NSWindowController {
         settingsWindowController?.show()
     }
 
+    /// TextKit can report several intermediate geometries while it lays out a
+    /// wrapped line. Coalesce them, then let this controller be the sole owner
+    /// of the panel frame. SwiftUI receives the resulting layout only to draw.
+    private func scheduleLayoutUpdate() {
+        layoutUpdateWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in self?.applySettings() }
+        layoutUpdateWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(16), execute: workItem)
+    }
+
     private func applySettings() {
         guard let panel = window else { return }
+        let maximumHeight = min(CGFloat(800), targetScreen.visibleFrame.height - 8)
+        let requestedHeight: CGFloat
+        if settings.overflowBehavior == .growWithContent {
+            requestedHeight = max(CGFloat(settings.normalizedHeight), presentation.model.editorContentHeight + 91)
+        } else {
+            requestedHeight = CGFloat(settings.normalizedHeight)
+        }
+        let openHeight = min(max(CGFloat(CueSettings.minimumWindowHeight), requestedHeight), maximumHeight)
+        if abs(presentation.effectiveOpenHeight - openHeight) >= 0.5 {
+            presentation.effectiveOpenHeight = openHeight
+        }
+
+        let targetLayout = NotchLayout(
+            screen: screenGeometry,
+            preferredOpenWidth: settings.normalizedWidth,
+            preferredOpenHeight: openHeight
+        )
         let contentSize = CGSize(
-            width: layout.openSize.width + 36,
-            height: layout.openSize.height + 24
+            width: targetLayout.openSize.width + 36,
+            height: targetLayout.openSize.height + 24
         )
         let frame = targetScreen.frame
-        panel.setFrame(
-            NSRect(
-                x: frame.midX - contentSize.width / 2,
-                y: frame.maxY - contentSize.height,
-                width: contentSize.width,
-                height: contentSize.height
-            ),
-            display: true,
-            animate: panel.isVisible
+        let targetFrame = NSRect(
+            x: frame.midX - contentSize.width / 2,
+            y: frame.maxY - contentSize.height,
+            width: contentSize.width,
+            height: contentSize.height
         )
-        panel.level = settings.alwaysOnTop
-            ? NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
-            : .normal
-    }
-
-    private func installStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "CUE"
-
-        let menu = NSMenu()
-        let showItem = NSMenuItem(
-            title: CueLocalization.string(
-                .sessionShow,
-                fallback: "Show Cue",
-                localization: settings.localizationIdentifier
-            ),
-            action: #selector(showFromStatusItem),
-            keyEquivalent: ""
-        )
-        showItem.target = self
-        menu.addItem(showItem)
-
-        let cancelItem = NSMenuItem(
-            title: CueLocalization.string(
-                .sessionCancel,
-                fallback: "Cancel Wait",
-                localization: settings.localizationIdentifier
-            ),
-            action: #selector(cancel),
-            keyEquivalent: ""
-        )
-        cancelItem.target = self
-        menu.addItem(cancelItem)
-        item.menu = menu
-        statusItem = item
-    }
-
-    private func removeStatusItem() {
-        guard let statusItem else { return }
-        NSStatusBar.system.removeStatusItem(statusItem)
-        self.statusItem = nil
+        let currentFrame = panel.frame
+        let frameChanged = abs(currentFrame.origin.x - targetFrame.origin.x) >= 0.5
+            || abs(currentFrame.origin.y - targetFrame.origin.y) >= 0.5
+            || abs(currentFrame.width - targetFrame.width) >= 0.5
+            || abs(currentFrame.height - targetFrame.height) >= 0.5
+        if frameChanged {
+            // Repeated AppKit frame animations were the visible jump. The
+            // coalesced final geometry is applied once with its top edge fixed.
+            panel.setFrame(targetFrame, display: true, animate: false)
+        }
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
     }
 
     private func configure(_ panel: NSPanel) {
@@ -228,9 +242,7 @@ final class PromptWindowController: NSWindowController {
         panel.isReleasedWhenClosed = false
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
-        panel.level = settings.alwaysOnTop
-            ? NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
-            : .normal
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
         panel.collectionBehavior = [
             .canJoinAllSpaces,
             .fullScreenAuxiliary,
@@ -247,15 +259,23 @@ final class PromptWindowController: NSWindowController {
         didFinish = true
 
         settingsWindowController?.close()
-        removeStatusItem()
         window?.makeFirstResponder(nil)
-        model.isExpanded = false
+        presentation.isExpanded = false
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { [weak self] in
             guard let self else { return }
             self.window?.orderOut(nil)
             self.completion(outcome)
         }
+    }
+
+    private func observeContentHeight(for model: PromptModel) {
+        contentHeightObservation = model.$editorContentHeight
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                guard self?.settings.overflowBehavior == .growWithContent else { return }
+                self?.scheduleLayoutUpdate()
+            }
     }
 
     private static func geometry(for screen: NSScreen) -> NotchScreenGeometry {

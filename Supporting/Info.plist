@@ -7,7 +7,7 @@
     <key>CFBundleDisplayName</key>
     <string>Cue Notepad</string>
     <key>CFBundleExecutable</key>
-    <string>cue</string>
+    <string>cue-host</string>
     <key>CFBundleIdentifier</key>
     <string>dev.zen1th.cue-notepad</string>
     <key>CFBundleInfoDictionaryVersion</key>

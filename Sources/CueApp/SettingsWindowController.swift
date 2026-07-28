@@ -30,17 +30,41 @@ struct CueSettingsView: View {
                         dimensionField(
                             localized(.settingsHeight, "Height"),
                             value: $settings.windowHeight,
-                            range: 220 ... 800
+                            range: CueSettings.minimumWindowHeight ... 800
                         )
                     }
+                    Button {
+                        settings.windowWidth = CueSettings.defaultWindowWidth
+                        settings.windowHeight = CueSettings.defaultWindowHeight
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                    }
+                    .help("Restore default window size")
+                    .disabled(settings.normalizedWidth == CueSettings.defaultWindowWidth && settings.normalizedHeight == CueSettings.defaultWindowHeight)
                 }
 
-                Toggle(
-                    localized(.settingsAlwaysOnTop, "Keep prompt above other windows"),
-                    isOn: $settings.alwaysOnTop
-                )
             } header: {
                 Text(localized(.settingsGeneral, "General"))
+            }
+
+            Section {
+                Picker(localized(.settingsOverflowBehavior, "Editor Height"), selection: $settings.overflowBehavior) {
+                    Text(localized(.settingsOverflowScrollable, "Scrollable Window"))
+                        .tag(CueOverflowBehavior.scrollable)
+                    Text(localized(.settingsOverflowGrow, "Grow with Content"))
+                        .tag(CueOverflowBehavior.growWithContent)
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text(localized(.settingsEditor, "Editor"))
+            }
+
+            Section {
+                shortcutRow(localized(.shortcutToggle, "Show or hide Cue"), shortcut: $settings.toggleShortcut)
+                shortcutRow(localized(.shortcutPrevious, "Previous session"), shortcut: $settings.previousShortcut)
+                shortcutRow(localized(.shortcutNext, "Next session"), shortcut: $settings.nextShortcut)
+            } header: {
+                Text(localized(.settingsShortcuts, "Shortcuts"))
             }
 
             Text(localized(
@@ -51,7 +75,17 @@ struct CueSettingsView: View {
             .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 290)
+        .frame(minWidth: 500, maxWidth: .infinity, minHeight: 390, maxHeight: .infinity)
+    }
+
+    private func shortcutRow(_ label: String, shortcut: Binding<CueShortcut>) -> some View {
+        LabeledContent(label) {
+            CueShortcutRecorder(
+                shortcut: shortcut,
+                recordingPrompt: localized(.shortcutRecord, "Type shortcut…")
+            )
+            .frame(width: 110, height: 24)
+        }
     }
 
     private func dimensionField(
@@ -80,27 +114,31 @@ struct CueSettingsView: View {
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let settings: CueSettings
+    private let targetScreen: NSScreen
     private let onClose: () -> Void
     private var languageObservation: AnyCancellable?
 
-    init(settings: CueSettings, onClose: @escaping () -> Void) {
+    init(settings: CueSettings, screen: NSScreen, onClose: @escaping () -> Void) {
         self.settings = settings
+        self.targetScreen = screen
         self.onClose = onClose
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 290),
-            styleMask: [.titled, .closable, .miniaturizable],
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 390),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
-        window.contentViewController = NSHostingController(
-            rootView: CueSettingsView(settings: settings)
-        )
+        let hostingView = NSHostingView(rootView: CueSettingsView(settings: settings))
+        hostingView.frame = NSRect(x: 0, y: 0, width: 500, height: 390)
+        hostingView.autoresizingMask = [.width, .height]
+        window.contentView = hostingView
+        window.setContentSize(NSSize(width: 500, height: 390))
         window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = false
         window.toolbarStyle = .automatic
-        window.animationBehavior = .documentWindow
-        window.center()
+        window.animationBehavior = .none
+        window.contentMinSize = NSSize(width: 500, height: 390)
 
         super.init(window: window)
         window.delegate = self
@@ -117,9 +155,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     func show() {
         refreshTitle()
-        showWindow(nil)
-        window?.center()
-        window?.makeKeyAndOrderFront(nil)
+        guard let window else { return }
+        window.contentView?.layoutSubtreeIfNeeded()
+        // Center only after the final fixed content size is known; the first
+        // SwiftUI layout must not be allowed to move the window afterwards.
+        window.setContentSize(NSSize(width: 500, height: 390))
+        let visible = targetScreen.visibleFrame
+        window.setFrameOrigin(NSPoint(
+            x: visible.midX - window.frame.width / 2,
+            y: visible.midY - window.frame.height / 2
+        ))
+        window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
