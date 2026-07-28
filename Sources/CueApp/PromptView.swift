@@ -164,18 +164,12 @@ struct PromptView: View {
             height: presentation.isExpanded ? layout.openSize.height : layout.closedSize.height,
             alignment: .top
         )
-        .animation(.spring(response: 0.40, dampingFraction: 0.84), value: presentation.isExpanded)
         .frame(
             width: layout.openSize.width + 36,
             height: layout.openSize.height + 24,
             alignment: .top
         )
         .preferredColorScheme(.dark)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) {
-                presentation.isExpanded = true
-            }
-        }
     }
 
     private var editorContent: some View {

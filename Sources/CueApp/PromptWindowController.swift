@@ -90,6 +90,7 @@ final class PromptWindowController: NSWindowController {
 
     func show() {
         guard let panel = window else { return }
+        let shouldExpand = !presentation.isExpanded
 
         let frame = targetScreen.frame
         panel.setFrameOrigin(NSPoint(
@@ -97,13 +98,26 @@ final class PromptWindowController: NSWindowController {
             y: frame.maxY - panel.frame.height
         ))
         panel.alphaValue = 1
-        presentation.isExpanded = true
         applySettings()
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-            guard let self, let editor = self.editor else { return }
-            self.window?.makeFirstResponder(editor)
+
+        guard shouldExpand else {
+            focusEditor(after: 0.05)
+            return
+        }
+
+        // The panel is deliberately displayed while PromptView is still in its
+        // collapsed state. Waiting one run-loop lets NSHostingView resolve its
+        // final bounds before the notch animation starts, avoiding the first
+        // layout's top-left-to-bottom-right fill effect.
+        panel.contentView?.layoutSubtreeIfNeeded()
+        panel.contentView?.displayIfNeeded()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.didFinish, self.window?.isVisible == true else { return }
+            self.window?.contentView?.layoutSubtreeIfNeeded()
+            self.setExpanded(true)
+            self.focusEditor(after: 0.05)
         }
     }
 
@@ -147,17 +161,16 @@ final class PromptWindowController: NSWindowController {
     @objc func hideTemporarily() {
         guard !didFinish else { return }
         settingsWindowController?.close()
-        presentation.isExpanded = false
+        setExpanded(false)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { [weak self] in
-            guard let self, !self.didFinish else { return }
+            guard let self, !self.didFinish, !self.presentation.isExpanded else { return }
             self.window?.orderOut(nil)
         }
     }
 
     @objc func showAfterHiding() {
         guard !didFinish else { return }
-        presentation.isExpanded = true
         show()
     }
 
@@ -260,12 +273,29 @@ final class PromptWindowController: NSWindowController {
 
         settingsWindowController?.close()
         window?.makeFirstResponder(nil)
-        presentation.isExpanded = false
+        setExpanded(false)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { [weak self] in
             guard let self else { return }
             self.window?.orderOut(nil)
             self.completion(outcome)
+        }
+    }
+
+    /// Controller-owned animation entry point used by both presentation and
+    /// dismissal. PromptView is intentionally a pure renderer and never
+    /// mutates `isExpanded` from `onAppear`.
+    private func setExpanded(_ expanded: Bool) {
+        guard presentation.isExpanded != expanded else { return }
+        withAnimation(.spring(response: 0.40, dampingFraction: 0.84)) {
+            presentation.isExpanded = expanded
+        }
+    }
+
+    private func focusEditor(after delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, let editor = self.editor else { return }
+            self.window?.makeFirstResponder(editor)
         }
     }
 
