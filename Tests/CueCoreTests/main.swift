@@ -115,6 +115,22 @@ expect(
     tokenCounter.count("The quick brown fox jumps over the lazy dog") == 9,
     "sentence cl100k token count"
 )
+let tokenVectors: [(String, Int)] = [
+    ("你好，世界！", 7),
+    ("emoji: 👨‍👩‍👧‍👦 🚀✨", 24),
+    ("line one\n第二行\n\nend", 9),
+    ("don't we'll they've", 6),
+    ("   \n\t  ", 2),
+    ("1234567890", 4),
+    ("中文 English mixed 42%", 7),
+]
+for (text, expectedCount) in tokenVectors {
+    expect(tokenCounter.count(text) == expectedCount, "cl100k vector: \(text.debugDescription)")
+}
+expect(
+    tokenCounter.count("cancel me", cancellingWhen: { true }) == nil,
+    "cancelled token count"
+)
 
 if failureCount == 0 {
     print("All CueCore tests passed")

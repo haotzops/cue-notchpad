@@ -7,6 +7,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-$ROOT/build}"
 APP="$OUTPUT_DIR/Cue Notepad.app"
 
 cd "$ROOT"
+"$ROOT/Scripts/generate-tokenizer-index.py"
 swift build -c "$CONFIGURATION" --product cue
 swift build -c "$CONFIGURATION" --product cue-host
 BIN_DIR="$(swift build -c "$CONFIGURATION" --show-bin-path)"
@@ -26,7 +27,7 @@ for resource_bundle in "$BIN_DIR"/CueNotepad_*.bundle; do
     for localization in "$resource_bundle"/*.lproj; do
         cp -R "$localization" "$APP/Contents/Resources/"
     done
-    for resource in "$resource_bundle"/*.tiktoken; do
+    for resource in "$resource_bundle"/*.cuebpe; do
         cp "$resource" "$APP/Contents/Resources/"
     done
 done

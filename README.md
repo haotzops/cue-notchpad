@@ -1,6 +1,6 @@
 # Cue Notepad
 
-`cue --wait` 是一个只做一件事的 macOS prompt 编辑器：从命令行打开依附在屏幕顶部 notch 上的编辑面板，等待编辑完成，再把文本原样写回标准输出。
+Cue Notepad 只做一件事，替代你的 `code --wait`/`cot --wait` 作为外挂 prompt 编辑器：从命令行打开依附在屏幕顶部 notch 上的编辑面板，等待编辑完成，再把文本原样写回标准输出。
 
 ## 使用
 
@@ -17,7 +17,7 @@ cue --wait
 - 普通 `Return`：在 prompt 中换行
 - 若 stdin 是管道，其内容会作为初始 prompt
 
-底部的 token 数使用本地内置的 OpenAI `cl100k_base` tokenizer 计算；prompt 内容不会因此发送到网络。
+底部的 token 数使用本地内置的 OpenAI `cl100k_base` tokenizer 计算；prompt 内容不会因此发送到网络。词表在构建期转换为连续二进制哈希索引，运行时只读映射，不会为 100,256 个 token 分别创建 Swift 对象。
 
 示例：
 
@@ -86,3 +86,4 @@ APP_DIR=/Applications BIN_DIR=/usr/local/bin make install
 - 等待及焦点恢复语义参考本地 CotEditor 的 `cot --wait`；轻量 `cue` 客户端经用户私有 Unix socket 将请求交给单一 GUI Host，shell 自然阻塞至自己的会话结束。
 - 应用采用 accessory activation policy，不显示 Dock 图标；不依赖菜单栏状态项，并安装本地化的标准 Edit responder-chain 菜单来支持 Command-C/V、撤销、重做、剪切和全选。
 - 设置存储在标准 macOS `UserDefaults` 中，通过 `⌘ ,` 打开原生风格设置窗口。
+- `Supporting/Tokenizer/cl100k_base.tiktoken` 是上游词表来源；`Scripts/generate-tokenizer-index.py` 会校验其 SHA-256，并生成 app 实际使用的紧凑 `cl100k_base.cuebpe` 资源。

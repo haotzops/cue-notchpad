@@ -1,9 +1,12 @@
-.PHONY: build test app install clean
+.PHONY: tokenizer build test app install clean
 
-build:
+tokenizer:
+	./Scripts/generate-tokenizer-index.py
+
+build: tokenizer
 	swift build
 
-test:
+test: tokenizer
 	swift run cue-core-tests
 
 app:

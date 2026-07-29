@@ -3,14 +3,36 @@ import Combine
 import CueCore
 import SwiftUI
 
+private final class TokenCountCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+}
+
 final class PromptModel: ObservableObject {
+    private static let tokenQueue = DispatchQueue(
+        label: "dev.zen1th.cue-notepad.token-counter",
+        qos: .utility
+    )
+
     @Published private(set) var text: String {
         didSet { scheduleTokenCount() }
     }
     @Published var tokenCount = 0
     @Published private(set) var editorContentHeight: CGFloat = 42
 
-    private var tokenWorkItem: DispatchWorkItem?
+    private var tokenRequest: TokenCountCancellation?
 
     init(text: String) {
         self.text = text
@@ -18,7 +40,7 @@ final class PromptModel: ObservableObject {
     }
 
     deinit {
-        tokenWorkItem?.cancel()
+        tokenRequest?.cancel()
     }
 
     /// The editor calls this only after NSTextInputClient has committed a text
@@ -36,25 +58,32 @@ final class PromptModel: ObservableObject {
     }
 
     private func scheduleTokenCount() {
-        tokenWorkItem?.cancel()
+        tokenRequest?.cancel()
         let snapshot = text
         guard !snapshot.isEmpty else {
+            tokenRequest = nil
             tokenCount = 0
             return
         }
 
-        let workItem = DispatchWorkItem { [weak self] in
-            let count = CueTokenCounter.shared.count(snapshot)
+        let request = TokenCountCancellation()
+        tokenRequest = request
+        Self.tokenQueue.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+            guard !request.isCancelled,
+                  let count = CueTokenCounter.shared.count(
+                    snapshot,
+                    cancellingWhen: { request.isCancelled }
+                  )
+            else { return }
             DispatchQueue.main.async {
-                guard let self, self.text == snapshot else { return }
+                guard let self,
+                      self.tokenRequest === request,
+                      self.text == snapshot
+                else { return }
+                self.tokenRequest = nil
                 self.tokenCount = count
             }
         }
-        tokenWorkItem = workItem
-        DispatchQueue.global(qos: .userInitiated).asyncAfter(
-            deadline: .now() + 0.12,
-            execute: workItem
-        )
     }
 }
 

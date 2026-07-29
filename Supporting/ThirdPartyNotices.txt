@@ -1,6 +1,6 @@
 cl100k_base tokenizer vocabulary
 
-The bundled cl100k_base.tiktoken vocabulary is from OpenAI's tiktoken project:
+The bundled cl100k_base.cuebpe index is generated without semantic changes from the cl100k_base.tiktoken vocabulary in OpenAI's tiktoken project:
 https://github.com/openai/tiktoken
 
 MIT License
