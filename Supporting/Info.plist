@@ -10,6 +10,8 @@
     <string>cue-host</string>
     <key>CFBundleIdentifier</key>
     <string>io.github.haotzops.cue-notchpad</string>
+    <key>CFBundleIconFile</key>
+    <string>cue-logo</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
