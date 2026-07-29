@@ -1,6 +1,6 @@
 import Foundation
 
-/// The deliberately small command-line surface of Cue Notepad.
+/// The deliberately small command-line surface of Cue Notchpad.
 public struct CueArguments: Equatable, Sendable {
     public let waitsForEditing: Bool
     public let filePath: String?

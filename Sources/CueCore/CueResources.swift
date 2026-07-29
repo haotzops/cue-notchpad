@@ -19,7 +19,7 @@ enum CueResources {
             return .main
         }
 
-        for name in ["CueNotepad_CueCore.bundle", "CueNotepad_CueCore.resources"] {
+        for name in ["CueNotchpad_CueCore.bundle", "CueNotchpad_CueCore.resources"] {
             if let bundle = Bundle(url: executableDirectory.appendingPathComponent(name)) {
                 return bundle
             }

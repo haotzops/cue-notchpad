@@ -64,7 +64,7 @@ if connection == nil {
     launchHost()
     for _ in 0..<50 { usleep(100_000); if let fd = connectSocket() { connection = fd; break } }
 }
-guard let fd = connection else { stderr("cue: unable to start Cue Notepad"); exit(EXIT_FAILURE) }
+guard let fd = connection else { stderr("cue: unable to start Cue Notchpad"); exit(EXIT_FAILURE) }
 guard let payload = try? CueIPC.encode(request) else { stderr("cue: unable to encode edit request"); exit(EXIT_FAILURE) }
 guard writeAll(fd, payload) else { stderr("cue: unable to send edit request: \(String(cString: strerror(errno)))"); close(fd); exit(EXIT_FAILURE) }
 let responseData = readAll(fd); close(fd)

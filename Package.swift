@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "CueNotepad",
+    name: "CueNotchpad",
     defaultLocalization: "en",
     platforms: [.macOS(.v13)],
     products: [

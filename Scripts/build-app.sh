@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIGURATION="${CONFIGURATION:-release}"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT/build}"
-APP="$OUTPUT_DIR/Cue Notepad.app"
+APP="$OUTPUT_DIR/Cue Notchpad.app"
 
 cd "$ROOT"
 "$ROOT/Scripts/generate-tokenizer-index.py"
@@ -23,7 +23,7 @@ cp "$ROOT/Supporting/ThirdPartyNotices.txt" "$APP/Contents/Resources/"
 # localized folders into the conventional app-bundle Resources directory so
 # Bundle.main and localized Info.plist values both work after installation.
 shopt -s nullglob
-for resource_bundle in "$BIN_DIR"/CueNotepad_*.bundle; do
+for resource_bundle in "$BIN_DIR"/CueNotchpad_*.bundle; do
     for localization in "$resource_bundle"/*.lproj; do
         cp -R "$localization" "$APP/Contents/Resources/"
     done

@@ -1,6 +1,6 @@
-# Cue Notepad
+# Cue Notchpad
 
-Cue Notepad 只做一件事，替代你的 `code --wait`/`cot --wait` 作为外挂 prompt 编辑器：从命令行打开依附在屏幕顶部 notch 上的编辑面板，等待编辑完成，再把文本原样写回标准输出。
+Cue Notchpad 只做一件事，替代你的 `code --wait`/`cot --wait` 作为外挂 prompt 编辑器：从命令行打开依附在屏幕顶部 notch 上的编辑面板，等待编辑完成，再把文本原样写回标准输出。
 
 ## 使用
 
@@ -55,7 +55,7 @@ make app
 app bundle 会生成到：
 
 ```text
-build/Cue Notepad.app
+build/Cue Notchpad.app
 ```
 
 ## 安装
@@ -69,7 +69,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 这会创建：
 
-- `~/Applications/Cue Notepad.app`
+- `~/Applications/Cue Notchpad.app`
 - `~/.local/bin/cue`
 
 也可以安装到系统目录：

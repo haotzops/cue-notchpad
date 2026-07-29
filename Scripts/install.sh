@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="${APP_DIR:-$HOME/Applications}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
-SOURCE_APP="$ROOT/build/Cue Notepad.app"
-TARGET_APP="$APP_DIR/Cue Notepad.app"
+SOURCE_APP="$ROOT/build/Cue Notchpad.app"
+TARGET_APP="$APP_DIR/Cue Notchpad.app"
 
 "$ROOT/Scripts/build-app.sh"
 mkdir -p "$APP_DIR" "$BIN_DIR"

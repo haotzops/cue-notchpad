@@ -5,15 +5,15 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>Cue Notepad</string>
+    <string>Cue Notchpad</string>
     <key>CFBundleExecutable</key>
     <string>cue-host</string>
     <key>CFBundleIdentifier</key>
-    <string>dev.zen1th.cue-notepad</string>
+    <string>dev.zen1th.cue-notchpad</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Cue Notepad</string>
+    <string>Cue Notchpad</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
