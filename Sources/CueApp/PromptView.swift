@@ -181,21 +181,32 @@ struct PromptView: View {
                 )
                 .stroke(Color.white.opacity(presentation.isExpanded ? 0.08 : 0), lineWidth: 1)
             }
-            .shadow(color: .black.opacity(presentation.isExpanded ? 0.75 : 0), radius: 14, y: 7)
 
-            editorContent
-                .opacity(presentation.isExpanded ? 1 : 0)
-                .scaleEffect(presentation.isExpanded ? 1 : 0.97, anchor: .top)
-                .allowsHitTesting(presentation.isExpanded)
+            if presentation.isExpanded {
+                editorContent
+                    // Keep the expanded layout stable while the notch frame grows.
+                    // Otherwise trailing Spacer content is repeatedly laid out at
+                    // intermediate widths and appears to slide in from the side.
+                    .frame(
+                        width: layout.openSize.width,
+                        height: layout.openSize.height,
+                        alignment: .top
+                    )
+                    .transition(
+                        .scale(scale: 0.8, anchor: .top)
+                            .combined(with: .opacity)
+                    )
+            }
         }
         .frame(
             width: presentation.isExpanded ? layout.openSize.width : layout.closedSize.width,
             height: presentation.isExpanded ? layout.openSize.height : layout.closedSize.height,
             alignment: .top
         )
+        .clipped()
         .frame(
-            width: layout.openSize.width + 36,
-            height: layout.openSize.height + 24,
+            width: layout.openSize.width,
+            height: layout.openSize.height,
             alignment: .top
         )
         .preferredColorScheme(.dark)

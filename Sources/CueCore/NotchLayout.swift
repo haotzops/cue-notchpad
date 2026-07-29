@@ -32,7 +32,7 @@ public struct NotchLayout: Equatable, Sendable {
 
     public init(
         screen: NotchScreenGeometry,
-        preferredOpenWidth: CGFloat = 650,
+        preferredOpenWidth: CGFloat = 550,
         preferredOpenHeight: CGFloat = 150
     ) {
         let measuredNotchWidth: CGFloat? = {

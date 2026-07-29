@@ -47,7 +47,7 @@ let notchedLayout = NotchLayout(screen: NotchScreenGeometry(
     rightAuxiliaryWidth: 664
 ))
 expect(notchedLayout.closedSize == CGSize(width: 188, height: 32), "physical notch measurement")
-expect(notchedLayout.openSize == CGSize(width: 650, height: 150), "standard open size")
+expect(notchedLayout.openSize == CGSize(width: 550, height: 150), "standard open size")
 expect(notchedLayout.contentTopInset == 32, "physical notch content inset")
 
 let plainLayout = NotchLayout(screen: NotchScreenGeometry(

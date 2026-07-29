@@ -26,7 +26,7 @@ enum CueOverflowBehavior: String, CaseIterable, Identifiable {
 
 final class CueSettings: ObservableObject {
     static let defaults = UserDefaults.standard
-    static let defaultWindowWidth = 650.0
+    static let defaultWindowWidth = 550.0
     static let defaultWindowHeight = 150.0
     static let minimumWindowHeight = 130.0
 
@@ -85,9 +85,10 @@ final class CueSettings: ObservableObject {
         language = CueLanguage(
             rawValue: Self.defaults.string(forKey: Keys.language) ?? "system"
         ) ?? .system
-        windowWidth = min(max(Self.defaults.double(forKey: Keys.windowWidth), 420), 1_200)
+        let storedWidth = Self.defaults.double(forKey: Keys.windowWidth)
+        windowWidth = storedWidth == 650 ? Self.defaultWindowWidth : min(max(storedWidth, 420), 1_200)
         let storedHeight = Self.defaults.double(forKey: Keys.windowHeight)
-        // Migrate only the previous shipped default; intentional user values remain untouched.
+        // Migrate only previous shipped defaults; other intentional user values remain untouched.
         windowHeight = storedHeight == 180 ? Self.defaultWindowHeight : min(max(storedHeight, Self.minimumWindowHeight), 800)
         overflowBehavior = CueOverflowBehavior(
             rawValue: Self.defaults.string(forKey: Keys.overflowBehavior) ?? "scrollable"

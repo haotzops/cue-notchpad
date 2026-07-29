@@ -47,10 +47,7 @@ final class PromptWindowController: NSWindowController {
         self.screenGeometry = screenGeometry
         self.completion = completion
 
-        let contentSize = CGSize(
-            width: initialLayout.openSize.width + 36,
-            height: initialLayout.openSize.height + 24
-        )
+        let contentSize = initialLayout.openSize
         let panel = CuePanel(
             contentRect: NSRect(origin: .zero, size: contentSize),
             styleMask: [.borderless, .fullSizeContentView],
@@ -220,10 +217,7 @@ final class PromptWindowController: NSWindowController {
             preferredOpenWidth: settings.normalizedWidth,
             preferredOpenHeight: openHeight
         )
-        let contentSize = CGSize(
-            width: targetLayout.openSize.width + 36,
-            height: targetLayout.openSize.height + 24
-        )
+        let contentSize = targetLayout.openSize
         let frame = targetScreen.frame
         let targetFrame = NSRect(
             x: frame.midX - contentSize.width / 2,
