@@ -22,7 +22,7 @@ private final class TokenCountCancellation: @unchecked Sendable {
 
 final class PromptModel: ObservableObject {
     private static let tokenQueue = DispatchQueue(
-        label: "dev.zen1th.cue-notchpad.token-counter",
+        label: "io.github.haotzops.cue-notchpad.token-counter",
         qos: .utility
     )
 

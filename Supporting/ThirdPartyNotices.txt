@@ -1,3 +1,18 @@
+Design and behavior references
+
+boring.notch
+https://github.com/TheBoredTeam/boring.notch
+Licensed under the GNU General Public License v3.0.
+Cue Notchpad's notch window and interaction design reference this project.
+
+CotEditor
+https://github.com/coteditor/CotEditor
+Source code licensed under the Apache License 2.0.
+Cue Notchpad's command waiting and focus restoration behavior reference this project.
+No CotEditor image resources are included.
+
+---
+
 cl100k_base tokenizer vocabulary
 
 The bundled cl100k_base.cuebpe index is generated without semantic changes from the cl100k_base.tiktoken vocabulary in OpenAI's tiktoken project:

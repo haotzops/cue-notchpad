@@ -75,7 +75,7 @@ public enum CueSessionResponse: Codable, Sendable, Equatable {
 
 public enum CueIPC {
     public static let socketPath = (FileManager.default.homeDirectoryForCurrentUser.path as NSString)
-        .appendingPathComponent("Library/Caches/dev.zen1th.cue-notchpad/cue.sock")
+        .appendingPathComponent("Library/Caches/io.github.haotzops.cue-notchpad/cue.sock")
     public static let maximumMessageBytes = 8 * 1024 * 1024
 
     public static func encode<T: Encodable>(_ value: T) throws -> Data {

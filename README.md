@@ -1,6 +1,57 @@
 # Cue Notchpad
 
-Cue Notchpad 只做一件事，替代你的 `code --wait`/`cot --wait` 作为外挂 prompt 编辑器：从命令行打开依附在屏幕顶部 notch 上的编辑面板，等待编辑完成，再把文本原样写回标准输出。
+Cue Notchpad 只做一件事，替代你的 `code --wait`/`cot --wait` 作为外挂 prompt 编辑器。安装后，你只需要在各类 agent 工具的配置文件中，将 editor 配置为 `cue --wait`。在会话中，使用 `Control-G` 即可弹出 Cue 编辑器。
+
+## 安装
+
+### Homebrew
+
+```bash
+brew install --cask haotzops/tap/cue-notchpad
+```
+
+打开 Cue 时提示「已损坏，无法打开」，是因为项目未经过 Apple 公证。确认仓库和下载来源可信后，也可以在安装时跳过 quarantine：
+
+```bash
+brew install --cask --no-quarantine haotzops/tap/cue-notchpad
+```
+
+该命令会同时安装 `Cue Notchpad.app` 和 `cue` 命令。升级或卸载：
+
+```bash
+brew upgrade --cask cue-notchpad
+brew uninstall --cask cue-notchpad
+```
+
+### GitHub Release
+
+1. 从 [GitHub Releases](https://github.com/haotzops/cue-notchpad/releases) 下载 `Cue-Notchpad-<版本>-macOS-universal.zip` 和 `SHA256SUMS`。
+2. 在两个文件所在的目录校验下载内容：
+
+   ```bash
+   shasum -a 256 -c SHA256SUMS
+   ```
+
+3. 解压 ZIP，将 `Cue Notchpad.app` 移到 `~/Applications`。
+4. 创建 `cue` 启动脚本，并确保 `~/.local/bin` 已加入 `PATH`：
+
+   ```bash
+   mkdir -p "$HOME/.local/bin"
+   cat > "$HOME/.local/bin/cue" <<'EOF'
+   #!/bin/sh
+   exec "$HOME/Applications/Cue Notchpad.app/Contents/MacOS/cue" "$@"
+   EOF
+   chmod +x "$HOME/.local/bin/cue"
+   export PATH="$HOME/.local/bin:$PATH"
+   ```
+
+打开 Cue 时提示「已损坏，无法打开」，是因为项目使用 ad-hoc 签名，未经过 Apple 公证。macOS 若阻止首次启动，请只在确认下载来源可信后，前往“系统设置 → 隐私与安全性”选择“仍要打开”；也可以只移除该 app 的 quarantine 属性：
+
+```bash
+sudo xattr -dr com.apple.quarantine "$HOME/Applications/Cue Notchpad.app"
+```
+
+不要使用 `spctl --master-disable` 全局关闭 Gatekeeper。
 
 ## 使用
 
@@ -13,52 +64,54 @@ cue --wait
 - `⌘ H`：暂时隐藏窗口但继续等待；不会提交、取消或修改原文件
 - `⌥⌘ C`：在任意应用中显示或隐藏 Cue（可在设置中修改）
 - `⌥⌘ ←` / `⌥⌘ →`：切换上一个/下一个并发会话（可在设置中修改）
-- `⌘ ,`：打开原生 macOS 设置窗口
+- `⌘ ,`：打开设置窗口
 - 普通 `Return`：在 prompt 中换行
-- 若 stdin 是管道，其内容会作为初始 prompt
-
-底部的 token 数使用本地内置的 OpenAI `cl100k_base` tokenizer 计算；prompt 内容不会因此发送到网络。词表在构建期转换为连续二进制哈希索引，运行时只读映射，不会为 100,256 个 token 分别创建 Swift 对象。
-
-示例：
-
-```bash
-prompt="$(cue --wait)"
-printf '重写这段 prompt' | cue --wait > edited.txt
-
-# 标准 $EDITOR / $VISUAL 文件接口（Pi、Codex、OpenCode 等）
-cue --wait /tmp/prompt.md
-cue /tmp/prompt.md
-```
 
 提交后会像 CotEditor 的 `cot --wait` 一样，把焦点还给调用命令时位于前台的终端应用。
 
-`cue` 兼容标准 `$EDITOR` / `$VISUAL` 约定：编辑器命令接收一个文本文件路径，成功提交才原子写回文件；`Esc` 返回 `130` 且不写回，因此调用方原有 prompt 会保留。Pi、Codex、OpenCode 都可将 `cue --wait` 配置为外部编辑器。
 
-多个并发请求由单一 Cue Host 同时管理而非串行阻塞。底部只在多于一个会话时显示 `‹ 2 / 4 ›`；箭头可切换会话，每个调用方各自等待并只获得自己的结果。顶部调用方名称来自父进程树（例如 Pi、Codex、OpenCode），不依赖专用 agent 协议。
+## 从源码构建
 
-界面会跟随 macOS 的首选语言，当前内置：
-
-- English
-- 简体中文
-
-设置窗口可以覆盖系统语言，配置展开内容区的宽度和最小高度（默认 `550 × 150 pt`，范围 `130–800 pt`），选择“可滚动窗口”或“随行数增加”，并录制全局显示/隐藏及前后会话快捷键。后者会按真实文本布局向下扩展，达到上限后自动滚动。Prompt 始终置顶。
-
-## 构建
-
-要求 macOS 13+ 和 Swift 6/Xcode Command Line Tools。
+要求 macOS 13+、Swift 6 和 Xcode Command Line Tools。首次使用可先安装命令行工具：
 
 ```bash
+xcode-select --install
+```
+
+获取源码并构建：
+
+```bash
+git clone https://github.com/haotzops/cue-notchpad.git
+cd cue-notchpad
 make test
 make app
+open "build/Cue Notchpad.app"
 ```
 
-app bundle 会生成到：
+`make app` 默认构建当前 Mac 的原生架构，app bundle 会生成到 `build/Cue Notchpad.app`。
+构建脚本支持以下环境变量：
 
-```text
-build/Cue Notchpad.app
+- `RELEASE_VERSION`：写入 `CFBundleShortVersionString`，默认读取 `Supporting/Info.plist`。
+- `BUILD_NUMBER`：写入 `CFBundleVersion`，必须是正整数，默认读取 `Supporting/Info.plist`。
+- `ARCHS`：用空格分隔的目标架构；不设置时只构建当前架构。
+- `CONFIGURATION`：`debug` 或 `release`，默认 `release`。
+- `OUTPUT_DIR`：app bundle 输出目录，默认 `build`。
+
+例如，构建版本号为 `0.1.0`、构建号为 `7` 的 Universal app：
+
+```bash
+RELEASE_VERSION=0.1.0 BUILD_NUMBER=7 ARCHS="arm64 x86_64" make app
 ```
 
-## 安装
+准备可上传的 ZIP 和 SHA-256 文件，但不进行上传或发布：
+
+```bash
+RELEASE_VERSION=0.1.0 BUILD_NUMBER=1 make release
+```
+
+产物位于 `dist/`。完整发布检查清单见 [`Docs/releasing.md`](Docs/releasing.md)。
+
+## 从源码安装
 
 默认安装到当前用户目录，不需要 sudo：
 
@@ -80,10 +133,10 @@ APP_DIR=/Applications BIN_DIR=/usr/local/bin make install
 
 如果对应目录不可写，请在命令前使用 `sudo`，并显式设置 `HOME` 或直接指定 `APP_DIR` / `BIN_DIR`。
 
-## 实现说明
+## 许可证与致谢
 
-- UI 参考本地 `boring.notch` 的顶部居中透明 panel、黑色 notch 容器、上下不同圆角和 spring 展开方式；编辑 panel 可以成为 key window，因此无需辅助功能权限即可输入。
-- 等待及焦点恢复语义参考本地 CotEditor 的 `cot --wait`；轻量 `cue` 客户端经用户私有 Unix socket 将请求交给单一 GUI Host，shell 自然阻塞至自己的会话结束。
-- 应用采用 accessory activation policy，不显示 Dock 图标；不依赖菜单栏状态项，并安装本地化的标准 Edit responder-chain 菜单来支持 Command-C/V、撤销、重做、剪切和全选。
-- 设置存储在标准 macOS `UserDefaults` 中，通过 `⌘ ,` 打开原生风格设置窗口。
-- `Supporting/Tokenizer/cl100k_base.tiktoken` 是上游词表来源；`Scripts/generate-tokenizer-index.py` 会校验其 SHA-256，并生成 app 实际使用的紧凑 `cl100k_base.cuebpe` 资源。
+Cue Notchpad 使用 [GNU GPL v3.0 only](LICENSE) 发布。
+界面实现参考 [boring.notch](https://github.com/TheBoredTeam/boring.notch)；
+`--wait` 及焦点恢复行为参考 [CotEditor](https://github.com/coteditor/CotEditor)。
+
+应用内置的 OpenAI `cl100k_base` 词表使用 MIT License。详细第三方声明见 [`Supporting/ThirdPartyNotices.txt`](Supporting/ThirdPartyNotices.txt)。

@@ -1,4 +1,4 @@
-.PHONY: tokenizer build test app install clean
+.PHONY: tokenizer build test app release install clean
 
 tokenizer:
 	./Scripts/generate-tokenizer-index.py
@@ -12,8 +12,11 @@ test: tokenizer
 app:
 	./Scripts/build-app.sh
 
+release:
+	./Scripts/build-release.sh
+
 install:
 	./Scripts/install.sh
 
 clean:
-	rm -rf .build build
+	rm -rf .build build dist
