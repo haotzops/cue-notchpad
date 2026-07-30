@@ -114,6 +114,8 @@ let spacingVectors: [(String, String)] = [
     ("v2版本", "v2 版本"),
     ("中文 English", "中文 English"),
     ("中文，English", "中文，English"),
+    ("English，中文", "English，中文"),
+    ("中文（English）", "中文（English）"),
     ("中文\nEnglish", "中文\nEnglish"),
     (" 中文", " 中文"),
 ]

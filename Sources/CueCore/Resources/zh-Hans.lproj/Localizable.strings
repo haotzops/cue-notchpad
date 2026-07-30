@@ -18,7 +18,7 @@
 "settings.editor_font" = "编辑器字体";
 "settings.choose_font" = "选择…";
 "settings.restore_default_font" = "恢复默认编辑器字体";
-"settings.chinese_english_spacing" = "中英文之间自动加空格";
+"settings.chinese_english_spacing" = "提交时自动在中英文之间加空格";
 "settings.chinese_english_spacing.hint" = "在提交 prompt 时应用。";
 "settings.overflow_behavior" = "溢出行为";
 "settings.overflow.scrollable" = "可滚动窗口";
