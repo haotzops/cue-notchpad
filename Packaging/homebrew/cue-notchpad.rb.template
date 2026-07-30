@@ -1,6 +1,6 @@
 cask "cue-notchpad" do
-  version "0.1.0"
-  sha256 "REPLACE_WITH_SHA256_FROM_SHA256SUMS"
+  version "0.2.0"
+  sha256 "9cb6da33ed3258434a3032e3069fab46d5f0b7d526f6e12c0d4f256831e19e49"
 
   url "https://github.com/haotzops/cue-notchpad/releases/download/v#{version}/Cue-Notchpad-#{version}-macOS-universal.zip"
   name "Cue Notchpad"
