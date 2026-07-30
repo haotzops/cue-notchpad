@@ -7,6 +7,10 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 
 ## [未发布]
 
+### 新增
+
+- 可在设置中通过 macOS 原生字体面板选择编辑器字体和字号；所选字体会立即应用并记住。未安装的已选字体会安全回退至系统字体。
+
 ### 变更
 
 - Homebrew Cask 安装完成后自动移除 Cue Notchpad 的 quarantine 属性，避免首次启动时被 Gatekeeper 阻止。

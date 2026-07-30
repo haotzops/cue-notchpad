@@ -15,6 +15,9 @@
 "settings.height" = "Height";
 "settings.size_hint" = "Changes apply to the current prompt window.";
 "settings.editor" = "Editor";
+"settings.editor_font" = "Editor Font";
+"settings.choose_font" = "Choose…";
+"settings.restore_default_font" = "Restore default editor font";
 "settings.overflow_behavior" = "Editor Height";
 "settings.overflow.scrollable" = "Scrollable Window";
 "settings.overflow.grow" = "Grow with Content";

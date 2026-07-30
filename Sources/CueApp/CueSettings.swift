@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 
@@ -29,6 +30,9 @@ final class CueSettings: ObservableObject {
     static let defaultWindowWidth = 550.0
     static let defaultWindowHeight = 150.0
     static let minimumWindowHeight = 130.0
+    static let defaultEditorFontSize = 16.0
+    static let minimumEditorFontSize = 8.0
+    static let maximumEditorFontSize = 72.0
 
     @Published var language: CueLanguage {
         didSet { Self.defaults.set(language.rawValue, forKey: Keys.language) }
@@ -60,6 +64,22 @@ final class CueSettings: ObservableObject {
         didSet { Self.defaults.set(overflowBehavior.rawValue, forKey: Keys.overflowBehavior) }
     }
 
+    /// Stored as a PostScript name because it remains stable across localized font display names.
+    @Published var editorFontName: String {
+        didSet { Self.defaults.set(editorFontName, forKey: Keys.editorFontName) }
+    }
+
+    @Published var editorFontSize: Double {
+        didSet {
+            let clamped = min(max(editorFontSize, Self.minimumEditorFontSize), Self.maximumEditorFontSize)
+            guard clamped == editorFontSize else {
+                editorFontSize = clamped
+                return
+            }
+            Self.defaults.set(editorFontSize, forKey: Keys.editorFontSize)
+        }
+    }
+
     @Published var toggleShortcut: CueShortcut {
         didSet { save(toggleShortcut, key: Keys.toggleShortcut) }
     }
@@ -74,12 +94,34 @@ final class CueSettings: ObservableObject {
     var normalizedWidth: Double { min(max(windowWidth, 420), 1_200) }
     var normalizedHeight: Double { min(max(windowHeight, Self.minimumWindowHeight), 800) }
 
+    /// Falls back safely if a font selected on another machine is not installed here.
+    var editorFont: NSFont {
+        NSFont(name: editorFontName, size: CGFloat(editorFontSize))
+            ?? .systemFont(ofSize: CGFloat(editorFontSize), weight: .regular)
+    }
+
+    func setEditorFont(_ font: NSFont) {
+        editorFontName = font.fontName
+        editorFontSize = Double(font.pointSize)
+    }
+
+    func restoreDefaultEditorFont() {
+        editorFontName = Self.defaultEditorFont.fontName
+        editorFontSize = Self.defaultEditorFontSize
+    }
+
+    private static var defaultEditorFont: NSFont {
+        .systemFont(ofSize: CGFloat(defaultEditorFontSize), weight: .regular)
+    }
+
     init() {
         Self.defaults.register(defaults: [
             Keys.language: CueLanguage.system.rawValue,
             Keys.windowWidth: Self.defaultWindowWidth,
             Keys.windowHeight: Self.defaultWindowHeight,
             Keys.overflowBehavior: CueOverflowBehavior.scrollable.rawValue,
+            Keys.editorFontName: Self.defaultEditorFont.fontName,
+            Keys.editorFontSize: Self.defaultEditorFontSize,
         ])
 
         language = CueLanguage(
@@ -93,6 +135,9 @@ final class CueSettings: ObservableObject {
         overflowBehavior = CueOverflowBehavior(
             rawValue: Self.defaults.string(forKey: Keys.overflowBehavior) ?? "scrollable"
         ) ?? .scrollable
+        editorFontName = Self.defaults.string(forKey: Keys.editorFontName) ?? Self.defaultEditorFont.fontName
+        let storedFontSize = Self.defaults.double(forKey: Keys.editorFontSize)
+        editorFontSize = min(max(storedFontSize, Self.minimumEditorFontSize), Self.maximumEditorFontSize)
         toggleShortcut = Self.loadShortcut(key: Keys.toggleShortcut, fallback: .toggleDefault)
         previousShortcut = Self.loadShortcut(key: Keys.previousShortcut, fallback: .previousDefault)
         nextShortcut = Self.loadShortcut(key: Keys.nextShortcut, fallback: .nextDefault)
@@ -115,6 +160,8 @@ final class CueSettings: ObservableObject {
         static let windowWidth = "windowWidth"
         static let windowHeight = "windowHeight"
         static let overflowBehavior = "overflowBehavior"
+        static let editorFontName = "editorFontName"
+        static let editorFontSize = "editorFontSize"
         static let toggleShortcut = "toggleShortcut"
         static let previousShortcut = "previousShortcut"
         static let nextShortcut = "nextShortcut"

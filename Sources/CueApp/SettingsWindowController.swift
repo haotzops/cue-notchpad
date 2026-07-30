@@ -48,6 +48,34 @@ struct CueSettingsView: View {
             }
 
             Section {
+                LabeledContent(localized(.settingsEditorFont, "Editor Font")) {
+                    HStack(spacing: 8) {
+                        Text("\(settings.editorFont.displayName ?? settings.editorFont.fontName) · \(settings.editorFont.pointSize.formatted()) pt")
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(settings.editorFont.fontName)
+                        Spacer(minLength: 8)
+                        CueEditorFontPicker(
+                            title: localized(.settingsChooseFont, "Choose…"),
+                            font: Binding(
+                                get: { settings.editorFont },
+                                set: { settings.setEditorFont($0) }
+                            )
+                        )
+                        Button {
+                            settings.restoreDefaultEditorFont()
+                        } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                        }
+                        .help(localized(.settingsRestoreDefaultFont, "Restore default editor font"))
+                        .disabled(
+                            settings.editorFontName == NSFont.systemFont(
+                                ofSize: CGFloat(CueSettings.defaultEditorFontSize)
+                            ).fontName && settings.editorFontSize == CueSettings.defaultEditorFontSize
+                        )
+                    }
+                }
+
                 Picker(localized(.settingsOverflowBehavior, "Editor Height"), selection: $settings.overflowBehavior) {
                     Text(localized(.settingsOverflowScrollable, "Scrollable Window"))
                         .tag(CueOverflowBehavior.scrollable)
@@ -75,7 +103,7 @@ struct CueSettingsView: View {
             .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
-        .frame(minWidth: 500, maxWidth: .infinity, minHeight: 390, maxHeight: .infinity)
+        .frame(minWidth: 500, maxWidth: .infinity, minHeight: 440, maxHeight: .infinity)
     }
 
     private func shortcutRow(_ label: String, shortcut: Binding<CueShortcut>) -> some View {
@@ -111,6 +139,44 @@ struct CueSettingsView: View {
     }
 }
 
+/// Bridges AppKit's shared font panel into the SwiftUI settings form.
+private struct CueEditorFontPicker: View {
+    let title: String
+    @Binding var font: NSFont
+    @State private var delegate: FontPanelDelegate?
+
+    var body: some View {
+        Button(title) {
+            delegate = FontPanelDelegate { manager in
+                font = manager.convert(font)
+            }
+            NSFontManager.shared.target = delegate
+            NSFontPanel.shared.setPanelFont(font, isMultiple: false)
+            NSFontPanel.shared.orderFront(nil)
+        }
+        .onDisappear {
+            NSFontManager.shared.target = nil
+            NSFontManager.shared.fontPanel(false)?.close()
+        }
+    }
+
+    private final class FontPanelDelegate: NSObject {
+        let action: (NSFontManager) -> Void
+
+        init(action: @escaping (NSFontManager) -> Void) {
+            self.action = action
+        }
+
+        @objc func changeFont(_ sender: NSFontManager) {
+            action(sender)
+        }
+
+        @objc func validModesForFontPanel(_ fontPanel: NSFontPanel) -> NSFontPanel.ModeMask {
+            [.collection, .face, .size]
+        }
+    }
+}
+
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let settings: CueSettings
@@ -124,21 +190,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         self.onClose = onClose
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 390),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 440),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         let hostingView = NSHostingView(rootView: CueSettingsView(settings: settings))
-        hostingView.frame = NSRect(x: 0, y: 0, width: 500, height: 390)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 500, height: 440)
         hostingView.autoresizingMask = [.width, .height]
         window.contentView = hostingView
-        window.setContentSize(NSSize(width: 500, height: 390))
+        window.setContentSize(NSSize(width: 500, height: 440))
         window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = false
         window.toolbarStyle = .automatic
         window.animationBehavior = .none
-        window.contentMinSize = NSSize(width: 500, height: 390)
+        window.contentMinSize = NSSize(width: 500, height: 440)
 
         super.init(window: window)
         window.delegate = self
@@ -159,7 +225,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.contentView?.layoutSubtreeIfNeeded()
         // Center only after the final fixed content size is known; the first
         // SwiftUI layout must not be allowed to move the window afterwards.
-        window.setContentSize(NSSize(width: 500, height: 390))
+        window.setContentSize(NSSize(width: 500, height: 440))
         let visible = targetScreen.visibleFrame
         window.setFrameOrigin(NSPoint(
             x: visible.midX - window.frame.width / 2,

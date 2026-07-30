@@ -370,6 +370,7 @@ private struct SessionEditor: View {
         ZStack(alignment: .topLeading) {
             PromptTextEditor(
                 model: model,
+                editorFont: settings.editorFont,
                 overflowBehavior: settings.overflowBehavior,
                 onSubmit: onSubmit,
                 onCancel: onCancel,
@@ -381,7 +382,7 @@ private struct SessionEditor: View {
 
             if model.text.isEmpty {
                 Text(placeholder)
-                    .font(.system(size: 16))
+                    .font(Font(settings.editorFont))
                     .foregroundStyle(.white.opacity(0.26))
                     .padding(.leading, 21)
                     .padding(.top, 13)

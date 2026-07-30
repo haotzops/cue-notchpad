@@ -15,6 +15,9 @@
 "settings.height" = "高度";
 "settings.size_hint" = "修改会立即应用于当前 prompt 窗口。";
 "settings.editor" = "编辑器";
+"settings.editor_font" = "编辑器字体";
+"settings.choose_font" = "选择…";
+"settings.restore_default_font" = "恢复默认编辑器字体";
 "settings.overflow_behavior" = "溢出行为";
 "settings.overflow.scrollable" = "可滚动窗口";
 "settings.overflow.grow" = "随行数增加";

@@ -5,6 +5,7 @@ import SwiftUI
 /// document changes and never uses a view refresh to overwrite NSTextView.
 struct PromptTextEditor: NSViewRepresentable {
     @ObservedObject var model: PromptModel
+    let editorFont: NSFont
     let overflowBehavior: CueOverflowBehavior
     let onSubmit: () -> Void
     let onCancel: () -> Void
@@ -32,7 +33,7 @@ struct PromptTextEditor: NSViewRepresentable {
         textView.onHide = onHide
         textView.onOpenSettings = onOpenSettings
         textView.string = model.text
-        textView.font = .systemFont(ofSize: 16, weight: .regular)
+        textView.font = editorFont
         textView.textColor = .white
         textView.insertionPointColor = .white
         textView.selectedTextAttributes = [
@@ -79,6 +80,7 @@ struct PromptTextEditor: NSViewRepresentable {
         applyOverflowBehavior(to: scrollView)
         guard let textView = scrollView.documentView as? NSTextView else { return }
         context.coordinator.applyExternalDocumentIfNeeded(to: textView)
+        applyEditorFontIfNeeded(to: textView)
         DispatchQueue.main.async { context.coordinator.reportCommittedContentHeight(of: textView) }
     }
 
@@ -86,6 +88,22 @@ struct PromptTextEditor: NSViewRepresentable {
         let scrollable = overflowBehavior == .scrollable
         scrollView.hasVerticalScroller = scrollable
         scrollView.autohidesScrollers = scrollable
+    }
+
+    private func applyEditorFontIfNeeded(to textView: NSTextView) {
+        guard textView.font?.fontName != editorFont.fontName || textView.font?.pointSize != editorFont.pointSize else {
+            return
+        }
+
+        textView.font = editorFont
+        textView.typingAttributes[.font] = editorFont
+        // Do not rewrite attributes while an input method owns marked text.
+        guard !textView.hasMarkedText(), let textStorage = textView.textStorage else { return }
+        textStorage.addAttribute(
+            .font,
+            value: editorFont,
+            range: NSRange(location: 0, length: textView.string.utf16.count)
+        )
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
