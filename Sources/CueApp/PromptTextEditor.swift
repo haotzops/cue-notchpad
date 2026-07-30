@@ -5,6 +5,7 @@ import SwiftUI
 /// document changes and never uses a view refresh to overwrite NSTextView.
 struct PromptTextEditor: NSViewRepresentable {
     @ObservedObject var model: PromptModel
+    @ObservedObject var settings: CueSettings
     let editorFont: NSFont
     let overflowBehavior: CueOverflowBehavior
     let onSubmit: () -> Void
@@ -63,6 +64,7 @@ struct PromptTextEditor: NSViewRepresentable {
         )
         textView.textContainer?.widthTracksTextView = true
         textView.identifier = NSUserInterfaceItemIdentifier("cue.prompt.editor")
+        context.coordinator.inlineCompletionController.attach(to: textView, settings: settings)
         scrollView.documentView = textView
         applyOverflowBehavior(to: scrollView)
         context.coordinator.recordInstalledText(model.text)
@@ -77,6 +79,7 @@ struct PromptTextEditor: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
+        context.coordinator.inlineCompletionController.updateSettings(settings)
         applyOverflowBehavior(to: scrollView)
         guard let textView = scrollView.documentView as? NSTextView else { return }
         context.coordinator.applyExternalDocumentIfNeeded(to: textView)
@@ -106,9 +109,11 @@ struct PromptTextEditor: NSViewRepresentable {
         )
     }
 
+    @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: PromptTextEditor
         private var installedText: String
+        let inlineCompletionController = InlineCompletionController()
 
         init(parent: PromptTextEditor) {
             self.parent = parent
@@ -139,6 +144,11 @@ struct PromptTextEditor: NSViewRepresentable {
             // input method commits or cancels it.
             guard !textView.hasMarkedText() else { return }
             commitDocument(from: textView)
+            inlineCompletionController.textDidChange()
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            inlineCompletionController.selectionDidChange()
         }
 
         func textDidEndEditing(_ notification: Notification) {
@@ -168,11 +178,49 @@ struct PromptTextEditor: NSViewRepresentable {
     }
 }
 
-private final class CueTextView: NSTextView {
+struct CueInlineCompletion: Equatable {
+    let start: Int
+    let text: String
+}
+
+final class CueTextView: NSTextView {
     var onSubmit: (() -> Void)?
     var onCancel: (() -> Void)?
     var onHide: (() -> Void)?
     var onOpenSettings: (() -> Void)?
+    var onAcceptInlineCompletion: (() -> Bool)?
+    var onDismissInlineCompletion: (() -> Bool)?
+    var inlineCompletion: CueInlineCompletion? { didSet { needsDisplay = true } }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let completion = inlineCompletion,
+              let container = textContainer,
+              let font = self.font,
+              completion.start <= string.utf16.count
+        else { return }
+
+        let document = NSMutableAttributedString(string: string, attributes: [.font: font])
+        let candidate = NSAttributedString(
+            string: completion.text,
+            attributes: [.font: font, .foregroundColor: NSColor.white.withAlphaComponent(0.36)]
+        )
+        document.insert(candidate, at: completion.start)
+        let storage = NSTextStorage(attributedString: document)
+        let manager = NSLayoutManager()
+        let scratchContainer = NSTextContainer(size: container.containerSize)
+        scratchContainer.lineFragmentPadding = container.lineFragmentPadding
+        scratchContainer.widthTracksTextView = container.widthTracksTextView
+        manager.addTextContainer(scratchContainer)
+        storage.addLayoutManager(manager)
+        let range = NSRange(location: completion.start, length: completion.text.utf16.count)
+        manager.ensureLayout(for: scratchContainer)
+        let glyphRange = manager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        manager.drawGlyphs(
+            forGlyphRange: glyphRange,
+            at: NSPoint(x: textContainerInset.width, y: textContainerInset.height)
+        )
+    }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -195,6 +243,8 @@ private final class CueTextView: NSTextView {
     override func keyDown(with event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let isReturn = event.keyCode == 36 || event.keyCode == 76
+        if event.keyCode == 48, flags.isEmpty, !hasMarkedText(), onAcceptInlineCompletion?() == true { return }
+        if event.keyCode == 53, !hasMarkedText(), onDismissInlineCompletion?() == true { return }
         if event.keyCode == 43, flags == .command, !hasMarkedText() { onOpenSettings?(); return }
         if event.keyCode == 4, flags == .command, !hasMarkedText() { onHide?(); return }
         if isReturn, flags.contains(.command), !hasMarkedText() { onSubmit?(); return }

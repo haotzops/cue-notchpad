@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import CueCore
 import Foundation
 
 enum CueLanguage: String, CaseIterable, Identifiable {
@@ -84,6 +85,13 @@ final class CueSettings: ObservableObject {
         didSet { Self.defaults.set(insertsSpacesBetweenChineseAndEnglish, forKey: Keys.insertsSpacesBetweenChineseAndEnglish) }
     }
 
+    @Published var inlineCompletionEnabled: Bool {
+        didSet { Self.defaults.set(inlineCompletionEnabled, forKey: Keys.inlineCompletionEnabled) }
+    }
+
+    @Published var inlineCompletionKeyConfigured = false
+    @Published var inlineCompletionStatus: String?
+
     @Published var toggleShortcut: CueShortcut {
         didSet { save(toggleShortcut, key: Keys.toggleShortcut) }
     }
@@ -127,6 +135,7 @@ final class CueSettings: ObservableObject {
             Keys.editorFontName: Self.defaultEditorFont.fontName,
             Keys.editorFontSize: Self.defaultEditorFontSize,
             Keys.insertsSpacesBetweenChineseAndEnglish: false,
+            Keys.inlineCompletionEnabled: false,
         ])
 
         language = CueLanguage(
@@ -144,9 +153,63 @@ final class CueSettings: ObservableObject {
         let storedFontSize = Self.defaults.double(forKey: Keys.editorFontSize)
         editorFontSize = min(max(storedFontSize, Self.minimumEditorFontSize), Self.maximumEditorFontSize)
         insertsSpacesBetweenChineseAndEnglish = Self.defaults.bool(forKey: Keys.insertsSpacesBetweenChineseAndEnglish)
+        inlineCompletionEnabled = Self.defaults.bool(forKey: Keys.inlineCompletionEnabled)
+        inlineCompletionKeyConfigured = (try? CueKeychain.loadDeepSeekAPIKey()) != nil
         toggleShortcut = Self.loadShortcut(key: Keys.toggleShortcut, fallback: .toggleDefault)
         previousShortcut = Self.loadShortcut(key: Keys.previousShortcut, fallback: .previousDefault)
         nextShortcut = Self.loadShortcut(key: Keys.nextShortcut, fallback: .nextDefault)
+    }
+
+    func saveDeepSeekAPIKey(_ key: String) {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            inlineCompletionStatus = localized(.settingsAPIKeyMissing, fallback: "Enter an API key before saving.")
+            return
+        }
+        do {
+            try CueKeychain.saveDeepSeekAPIKey(trimmed)
+            inlineCompletionKeyConfigured = true
+            inlineCompletionStatus = localized(.settingsAPIKeySaved, fallback: "API key saved in Keychain.")
+        } catch {
+            inlineCompletionStatus = error.localizedDescription
+        }
+    }
+
+    func testDeepSeekAPIKey() {
+        guard let apiKey = try? CueKeychain.loadDeepSeekAPIKey() else {
+            inlineCompletionStatus = localized(.settingsAPIKeyMissing, fallback: "Enter an API key before saving.")
+            return
+        }
+        inlineCompletionStatus = localized(.settingsTestingAPIKey, fallback: "Testing API key…")
+        Task { @MainActor [weak self] in
+            do {
+                try await DeepSeekFIMCompletionProvider().validate(apiKey: apiKey)
+                self?.inlineCompletionStatus = self?.localized(
+                    .settingsAPIKeyValid,
+                    fallback: "DeepSeek API key is valid."
+                )
+            } catch {
+                self?.inlineCompletionStatus = self?.localized(
+                    .settingsInlineCompletionUnavailable,
+                    fallback: "Inline completion is temporarily unavailable."
+                )
+            }
+        }
+    }
+
+    func removeDeepSeekAPIKey() {
+        do {
+            try CueKeychain.removeDeepSeekAPIKey()
+            inlineCompletionKeyConfigured = false
+            inlineCompletionEnabled = false
+            inlineCompletionStatus = localized(.settingsAPIKeyRemoved, fallback: "API key removed.")
+        } catch {
+            inlineCompletionStatus = error.localizedDescription
+        }
+    }
+
+    func localized(_ key: CueLocalizedKey, fallback: String) -> String {
+        CueLocalization.string(key, fallback: fallback, localization: language.localizationIdentifier)
     }
 
     private func save(_ shortcut: CueShortcut, key: String) {
@@ -169,6 +232,7 @@ final class CueSettings: ObservableObject {
         static let editorFontName = "editorFontName"
         static let editorFontSize = "editorFontSize"
         static let insertsSpacesBetweenChineseAndEnglish = "insertsSpacesBetweenChineseAndEnglish"
+        static let inlineCompletionEnabled = "inlineCompletionEnabled"
         static let toggleShortcut = "toggleShortcut"
         static let previousShortcut = "previousShortcut"
         static let nextShortcut = "nextShortcut"

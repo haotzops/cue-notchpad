@@ -1,7 +1,8 @@
 # DeepSeek FIM 行间补全开发方案
 
-> 状态：方案，尚未实现。  
-> 目标版本：在 v0.2.0 之后作为一个独立的 minor 版本发布，不与现有编辑器字体或中英文间距功能混合上线。
+> 状态：首版已实现，尚未发布。
+>
+> 实现范围：DeepSeek FIM SSE、Keychain API Key、默认关闭的设置、TextKit ghost text、Tab 接受/Esc 关闭、IME/异步取消保护及 Core 纯逻辑测试已完成。Provider HTTP mock、可配置接受键、多候选和用量展示保留为后续迭代。
 
 ## 1. 目标与边界
 

@@ -5,6 +5,7 @@ import SwiftUI
 
 struct CueSettingsView: View {
     @ObservedObject var settings: CueSettings
+    @State private var deepSeekAPIKey = ""
 
     private var localization: String? { settings.localizationIdentifier }
 
@@ -85,6 +86,53 @@ struct CueSettingsView: View {
                     "Apply spacing when the prompt is submitted."
                 ))
 
+                Toggle(
+                    localized(.settingsInlineCompletion, "Enable DeepSeek inline completion"),
+                    isOn: $settings.inlineCompletionEnabled
+                )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(localized(
+                        .settingsInlineCompletionHint,
+                        "When enabled, nearby prompt text is sent to DeepSeek FIM to generate a suggestion. Press Tab to accept it."
+                    ))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                    SecureField(
+                        localized(.settingsDeepSeekAPIKey, "DeepSeek API Key"),
+                        text: $deepSeekAPIKey
+                    )
+                    HStack {
+                        Button(localized(.settingsSaveAPIKey, "Save API Key")) {
+                            settings.saveDeepSeekAPIKey(deepSeekAPIKey)
+                            deepSeekAPIKey = ""
+                        }
+                        .disabled(deepSeekAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                        Button(localized(.settingsTestAPIKey, "Test Connection")) {
+                            settings.testDeepSeekAPIKey()
+                        }
+                        .disabled(!settings.inlineCompletionKeyConfigured)
+
+                        Button(localized(.settingsRemoveAPIKey, "Remove API Key")) {
+                            settings.removeDeepSeekAPIKey()
+                        }
+                        .disabled(!settings.inlineCompletionKeyConfigured)
+
+                        Text(settings.inlineCompletionKeyConfigured
+                            ? localized(.settingsAPIKeyConfigured, "Saved in Keychain")
+                            : localized(.settingsAPIKeyNotConfigured, "Not configured"))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let status = settings.inlineCompletionStatus {
+                        Text(status)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 Picker(localized(.settingsOverflowBehavior, "Editor Height"), selection: $settings.overflowBehavior) {
                     Text(localized(.settingsOverflowScrollable, "Scrollable Window"))
                         .tag(CueOverflowBehavior.scrollable)
@@ -112,7 +160,7 @@ struct CueSettingsView: View {
             .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
-        .frame(minWidth: 500, maxWidth: .infinity, minHeight: 440, maxHeight: .infinity)
+        .frame(minWidth: 500, maxWidth: .infinity, minHeight: 560, maxHeight: .infinity)
     }
 
     private func shortcutRow(_ label: String, shortcut: Binding<CueShortcut>) -> some View {
@@ -199,21 +247,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         self.onClose = onClose
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 440),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 560),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         let hostingView = NSHostingView(rootView: CueSettingsView(settings: settings))
-        hostingView.frame = NSRect(x: 0, y: 0, width: 500, height: 440)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 500, height: 560)
         hostingView.autoresizingMask = [.width, .height]
         window.contentView = hostingView
-        window.setContentSize(NSSize(width: 500, height: 440))
+        window.setContentSize(NSSize(width: 500, height: 560))
         window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = false
         window.toolbarStyle = .automatic
         window.animationBehavior = .none
-        window.contentMinSize = NSSize(width: 500, height: 440)
+        window.contentMinSize = NSSize(width: 500, height: 560)
 
         super.init(window: window)
         window.delegate = self
@@ -234,7 +282,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.contentView?.layoutSubtreeIfNeeded()
         // Center only after the final fixed content size is known; the first
         // SwiftUI layout must not be allowed to move the window afterwards.
-        window.setContentSize(NSSize(width: 500, height: 440))
+        window.setContentSize(NSSize(width: 500, height: 560))
         let visible = targetScreen.visibleFrame
         window.setFrameOrigin(NSPoint(
             x: visible.midX - window.frame.width / 2,

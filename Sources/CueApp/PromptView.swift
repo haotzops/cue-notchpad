@@ -370,6 +370,7 @@ private struct SessionEditor: View {
         ZStack(alignment: .topLeading) {
             PromptTextEditor(
                 model: model,
+                settings: settings,
                 editorFont: settings.editorFont,
                 overflowBehavior: settings.overflowBehavior,
                 onSubmit: onSubmit,

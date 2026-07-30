@@ -126,6 +126,34 @@ for (input, expected) in spacingVectors {
     )
 }
 
+let inlineDocument = "你好 👨‍👩‍👧‍👦hello世界"
+let inlineCaret = NSRange(location: ("你好 👨‍👩‍👧‍👦hello" as NSString).length, length: 0)
+let inlineContext = InlineCompletionContextBuilder.make(document: inlineDocument, selection: inlineCaret)
+expect(inlineContext?.prefix == "你好 👨‍👩‍👧‍👦hello", "inline completion prefix preserves grapheme clusters")
+expect(inlineContext?.suffix == "世界", "inline completion suffix")
+expect(InlineCompletionContextBuilder.make(document: inlineDocument, selection: NSRange(location: 1, length: 1)) == nil, "inline completion rejects selected text")
+
+let fimRequest = DeepSeekFIMRequest(model: "deepseek-v4-pro", prompt: "before", suffix: "after")
+if let encodedRequest = try? JSONEncoder().encode(fimRequest),
+   let requestObject = try? JSONSerialization.jsonObject(with: encodedRequest) as? [String: Any]
+{
+    expect(requestObject["max_tokens"] as? Int == 64, "FIM request max_tokens encoding")
+    expect(requestObject["stream"] as? Bool == true, "FIM request streaming encoding")
+    expect((requestObject["stream_options"] as? [String: Any])?["include_usage"] as? Bool == true, "FIM usage stream option")
+} else {
+    expect(false, "FIM request should encode")
+}
+
+var sseParser = DeepSeekFIMSSEParser()
+do {
+    let partialEvents = try sseParser.append(Data("data: {\"choices\":[{\"text\":\"hel".utf8))
+    expect(partialEvents.isEmpty, "SSE partial event waits for terminator")
+    let events = try sseParser.append(Data("lo\"}]}\n\ndata: [DONE]\n\n".utf8))
+    expect(events == ["{\"choices\":[{\"text\":\"hello\"}]}", "[DONE]"], "SSE parser combines chunked events")
+} catch {
+    expect(false, "SSE parser should parse: \(error)")
+}
+
 let tokenCounter = CueTokenCounter.shared
 expect(tokenCounter.count("") == 0, "empty token count")
 expect(tokenCounter.count("hello world") == 2, "basic cl100k token count")
