@@ -7,6 +7,8 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 
 ## [未发布]
 
+## [0.2.0] - 2026-07-30
+
 ### 新增
 
 - 可在设置中通过 macOS 原生字体面板选择编辑器字体和字号；所选字体会立即应用并记住。未安装的已选字体会安全回退至系统字体。
@@ -32,5 +34,6 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 - 使用本地 `cl100k_base` 词表计算 token，不发送网络请求。
 - 添加 Cue Notchpad 应用图标。
 
-[未发布]: https://github.com/haotzops/cue-notchpad/compare/v0.1.0...HEAD
+[未发布]: https://github.com/haotzops/cue-notchpad/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/haotzops/cue-notchpad/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/haotzops/cue-notchpad/releases/tag/v0.1.0
