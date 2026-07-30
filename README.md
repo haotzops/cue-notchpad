@@ -14,13 +14,9 @@ Cue Notchpad 只做一件事，替代你的 `code --wait`/`cot --wait` 作为外
 brew install --cask haotzops/tap/cue-notchpad
 ```
 
-打开 Cue 时提示「已损坏，无法打开」，是因为项目未经过 Apple 公证。确认仓库和下载来源可信后，也可以在安装时跳过 quarantine：
+该命令会同时安装 `Cue Notchpad.app` 和 `cue` 命令。项目使用 ad-hoc 签名，未经过 Apple 公证；Homebrew 安装完成后会自动移除该 app 的 quarantine 属性，从而避免首次启动时被 Gatekeeper 阻止。请仅在确认 Tap 和下载来源可信后安装。
 
-```bash
-brew install --cask --no-quarantine haotzops/tap/cue-notchpad
-```
-
-该命令会同时安装 `Cue Notchpad.app` 和 `cue` 命令。升级或卸载：
+升级或卸载：
 
 ```bash
 brew upgrade --cask cue-notchpad
@@ -49,13 +45,11 @@ brew uninstall --cask cue-notchpad
    export PATH="$HOME/.local/bin:$PATH"
    ```
 
-打开 Cue 时提示「已损坏，无法打开」，是因为项目使用 ad-hoc 签名，未经过 Apple 公证。macOS 若阻止首次启动，请只在确认下载来源可信后，前往“系统设置 → 隐私与安全性”选择“仍要打开”；也可以只移除该 app 的 quarantine 属性：
+打开 Cue 时提示「已损坏，无法打开」或者 未知开发者警告 ，是因为项目使用 ad-hoc 签名，未经过 Apple 开发者签名。macOS 若阻止首次启动，可前往“系统设置 → 隐私与安全性”选择“仍要打开”；也可以在命令行移除该 app 的 quarantine 属性：
 
 ```bash
-sudo xattr -dr com.apple.quarantine "$HOME/Applications/Cue Notchpad.app"
+xattr -dr com.apple.quarantine "$HOME/Applications/Cue Notchpad.app"
 ```
-
-不要使用 `spctl --master-disable` 全局关闭 Gatekeeper。
 
 ## 使用
 

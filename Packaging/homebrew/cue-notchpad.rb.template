@@ -7,14 +7,20 @@ cask "cue-notchpad" do
   desc "Notch-attached prompt editor for command-line workflows"
   homepage "https://github.com/haotzops/cue-notchpad"
 
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "Cue Notchpad.app"
   binary "#{appdir}/Cue Notchpad.app/Contents/MacOS/cue", target: "cue"
 
+  postflight do
+    app_path = appdir/"Cue Notchpad.app"
+    next unless app_path.exist?
+
+    system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", app_path]
+  end
+
   caveats <<~EOS
-    Cue Notchpad #{version} is ad-hoc signed and is not notarized by Apple.
-    If macOS blocks it, try to open the app once, then use:
-    System Settings -> Privacy & Security -> Open Anyway.
+    Cue Notchpad #{version} 使用 ad-hoc 签名，未经过 Apple 公证。
+    Homebrew 安装完成后会自动移除该 app 的 quarantine 属性。
   EOS
 end
