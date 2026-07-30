@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push or PR update makes an in-progress validation run obsolete.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Build and test
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate source metadata and scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n Scripts/*.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          compile(Path("Scripts/generate-tokenizer-index.py").read_text(), "generate-tokenizer-index.py", "exec")
+          PY
+          plutil -lint Supporting/Info.plist
+          plutil -lint Sources/CueCore/Resources/en.lproj/Localizable.strings
+          plutil -lint Sources/CueCore/Resources/zh-Hans.lproj/Localizable.strings
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Supporting/Info.plist)" = "io.github.haotzops.cue-notchpad"
+
+      - name: Build debug products
+        run: swift build
+
+      - name: Run core test suite
+        run: make test
+
+      - name: Build and validate native app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_VERSION=0.1.0 BUILD_NUMBER="$GITHUB_RUN_NUMBER" make app
+          app="build/Cue Notchpad.app"
+          plutil -lint "$app/Contents/Info.plist"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          test -f "$app/Contents/Resources/cue-logo.icns"
+          test -f "$app/Contents/Resources/ThirdPartyNotices.txt"
+          test -f "$app/Contents/Resources/LICENSE.txt"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = "io.github.haotzops.cue-notchpad"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "0.1.0"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = "$GITHUB_RUN_NUMBER"
+          xcrun lipo -archs "$app/Contents/MacOS/cue" | grep -qw "$(uname -m)"
+          xcrun lipo -archs "$app/Contents/MacOS/cue-host" | grep -qw "$(uname -m)"
+          set +e
+          "$app/Contents/MacOS/cue" --invalid-option >/dev/null 2>&1
+          status=$?
+          set -e
+          test "$status" -eq 64
+
+      - name: Build and validate universal release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_VERSION=0.1.0 BUILD_NUMBER="$GITHUB_RUN_NUMBER" make release
+          archive="dist/Cue-Notchpad-0.1.0-macOS-universal.zip"
+          test -f "$archive"
+          (cd dist && shasum -a 256 -c SHA256SUMS)
+          rm -rf /tmp/cue-release-check
+          mkdir -p /tmp/cue-release-check
+          ditto -x -k "$archive" /tmp/cue-release-check
+          app="/tmp/cue-release-check/Cue Notchpad.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          for executable in cue cue-host; do
+            archs="$(xcrun lipo -archs "$app/Contents/MacOS/$executable")"
+            [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]]
+          done
