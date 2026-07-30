@@ -133,6 +133,36 @@ APP_DIR=/Applications BIN_DIR=/usr/local/bin make install
 
 如果对应目录不可写，请在命令前使用 `sudo`，并显式设置 `HOME` 或直接指定 `APP_DIR` / `BIN_DIR`。
 
+卸载默认的源码安装（只会删除 `~/Applications/Cue Notchpad.app` 和由 `make install` 创建的 `~/.local/bin/cue`，不会影响 Homebrew）：
+
+```bash
+make uninstall
+```
+
+使用自定义安装目录时，用相同的变量卸载：
+
+```bash
+APP_DIR=/Applications BIN_DIR=/usr/local/bin make uninstall
+```
+
+## 在源码版与 Homebrew 版之间切换
+
+默认源码安装与 Homebrew 可以共存：前者使用 `~/Applications` 和 `~/.local/bin`，后者使用 `/Applications` 和 `/opt/homebrew/bin`。先退出正在运行的 Cue Host（可关闭 app，或运行 `pkill -x cue-host`），再用 `type -a cue` 查看 shell 会调用的命令。
+
+临时优先使用源码版：
+
+```bash
+PATH="$HOME/.local/bin:$PATH" cue --wait
+```
+
+临时优先使用 Homebrew 版：
+
+```bash
+PATH="/opt/homebrew/bin:$PATH" cue --wait
+```
+
+需要永久切换时，调整 shell 配置文件中这两个目录加入 `PATH` 的先后顺序；如果只使用 Homebrew，可执行 `make uninstall` 后保留 `brew install --cask haotzops/tap/cue-notchpad` 的安装结果。
+
 ## 许可证与致谢
 
 Cue Notchpad 使用 [GNU GPL v3.0 only](LICENSE) 发布。
