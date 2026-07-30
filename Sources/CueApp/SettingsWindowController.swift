@@ -76,6 +76,15 @@ struct CueSettingsView: View {
                     }
                 }
 
+                Toggle(
+                    localized(.settingsChineseEnglishSpacing, "Add spaces between Chinese and English"),
+                    isOn: $settings.insertsSpacesBetweenChineseAndEnglish
+                )
+                .help(localized(
+                    .settingsChineseEnglishSpacingHint,
+                    "Apply spacing when the prompt is submitted."
+                ))
+
                 Picker(localized(.settingsOverflowBehavior, "Editor Height"), selection: $settings.overflowBehavior) {
                     Text(localized(.settingsOverflowScrollable, "Scrollable Window"))
                         .tag(CueOverflowBehavior.scrollable)

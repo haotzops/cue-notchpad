@@ -18,6 +18,8 @@
 "settings.editor_font" = "Editor Font";
 "settings.choose_font" = "Choose…";
 "settings.restore_default_font" = "Restore default editor font";
+"settings.chinese_english_spacing" = "Add spaces between Chinese and English";
+"settings.chinese_english_spacing.hint" = "Apply spacing when the prompt is submitted.";
 "settings.overflow_behavior" = "Editor Height";
 "settings.overflow.scrollable" = "Scrollable Window";
 "settings.overflow.grow" = "Grow with Content";

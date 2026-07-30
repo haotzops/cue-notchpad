@@ -80,6 +80,10 @@ final class CueSettings: ObservableObject {
         }
     }
 
+    @Published var insertsSpacesBetweenChineseAndEnglish: Bool {
+        didSet { Self.defaults.set(insertsSpacesBetweenChineseAndEnglish, forKey: Keys.insertsSpacesBetweenChineseAndEnglish) }
+    }
+
     @Published var toggleShortcut: CueShortcut {
         didSet { save(toggleShortcut, key: Keys.toggleShortcut) }
     }
@@ -122,6 +126,7 @@ final class CueSettings: ObservableObject {
             Keys.overflowBehavior: CueOverflowBehavior.scrollable.rawValue,
             Keys.editorFontName: Self.defaultEditorFont.fontName,
             Keys.editorFontSize: Self.defaultEditorFontSize,
+            Keys.insertsSpacesBetweenChineseAndEnglish: false,
         ])
 
         language = CueLanguage(
@@ -138,6 +143,7 @@ final class CueSettings: ObservableObject {
         editorFontName = Self.defaults.string(forKey: Keys.editorFontName) ?? Self.defaultEditorFont.fontName
         let storedFontSize = Self.defaults.double(forKey: Keys.editorFontSize)
         editorFontSize = min(max(storedFontSize, Self.minimumEditorFontSize), Self.maximumEditorFontSize)
+        insertsSpacesBetweenChineseAndEnglish = Self.defaults.bool(forKey: Keys.insertsSpacesBetweenChineseAndEnglish)
         toggleShortcut = Self.loadShortcut(key: Keys.toggleShortcut, fallback: .toggleDefault)
         previousShortcut = Self.loadShortcut(key: Keys.previousShortcut, fallback: .previousDefault)
         nextShortcut = Self.loadShortcut(key: Keys.nextShortcut, fallback: .nextDefault)
@@ -162,6 +168,7 @@ final class CueSettings: ObservableObject {
         static let overflowBehavior = "overflowBehavior"
         static let editorFontName = "editorFontName"
         static let editorFontSize = "editorFontSize"
+        static let insertsSpacesBetweenChineseAndEnglish = "insertsSpacesBetweenChineseAndEnglish"
         static let toggleShortcut = "toggleShortcut"
         static let previousShortcut = "previousShortcut"
         static let nextShortcut = "nextShortcut"

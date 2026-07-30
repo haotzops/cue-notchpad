@@ -21,6 +21,8 @@ public enum CueLocalizedKey: String, Sendable {
     case settingsEditorFont = "settings.editor_font"
     case settingsChooseFont = "settings.choose_font"
     case settingsRestoreDefaultFont = "settings.restore_default_font"
+    case settingsChineseEnglishSpacing = "settings.chinese_english_spacing"
+    case settingsChineseEnglishSpacingHint = "settings.chinese_english_spacing.hint"
     case settingsOverflowBehavior = "settings.overflow_behavior"
     case settingsOverflowScrollable = "settings.overflow.scrollable"
     case settingsOverflowGrow = "settings.overflow.grow"

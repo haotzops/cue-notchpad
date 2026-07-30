@@ -148,7 +148,10 @@ final class PromptWindowController: NSWindowController {
     }
 
     func submit() {
-        finish(with: .submitted(presentation.model.text))
+        let text = settings.insertsSpacesBetweenChineseAndEnglish
+            ? CueTextSpacing.insertingSpacesBetweenChineseAndEnglish(in: presentation.model.text)
+            : presentation.model.text
+        finish(with: .submitted(text))
     }
 
     @objc func cancel() {

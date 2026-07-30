@@ -107,6 +107,23 @@ expect(
     "language-independent token label"
 )
 
+let spacingVectors: [(String, String)] = [
+    ("中文English", "中文 English"),
+    ("English中文", "English 中文"),
+    ("版本2.0", "版本 2.0"),
+    ("v2版本", "v2 版本"),
+    ("中文 English", "中文 English"),
+    ("中文，English", "中文，English"),
+    ("中文\nEnglish", "中文\nEnglish"),
+    (" 中文", " 中文"),
+]
+for (input, expected) in spacingVectors {
+    expect(
+        CueTextSpacing.insertingSpacesBetweenChineseAndEnglish(in: input) == expected,
+        "Chinese-English spacing: \(input.debugDescription)"
+    )
+}
+
 let tokenCounter = CueTokenCounter.shared
 expect(tokenCounter.count("") == 0, "empty token count")
 expect(tokenCounter.count("hello world") == 2, "basic cl100k token count")
