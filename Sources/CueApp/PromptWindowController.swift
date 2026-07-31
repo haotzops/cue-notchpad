@@ -41,6 +41,7 @@ final class PromptWindowController: NSWindowController {
             preferredOpenHeight: settings.normalizedHeight
         )
 
+        CueUsageStore.shared.recordCueOpen()
         self.presentation = PromptPresentation(model: model, sourceName: sourceName, sessionID: sessionID)
         self.settings = settings
         self.targetScreen = screen

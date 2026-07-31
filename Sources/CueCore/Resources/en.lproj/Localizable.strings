@@ -22,6 +22,11 @@
 "settings.chinese_english_spacing.hint" = "Apply spacing when the prompt is submitted.";
 "settings.inline_completion" = "Enable DeepSeek inline completion";
 "settings.inline_completion.hint" = "When enabled, nearby prompt text is sent to DeepSeek FIM to generate a suggestion. Press Tab to accept it.";
+"settings.inline_completion.model" = "Model";
+"settings.refresh_models" = "Refresh Models";
+"settings.loading_models" = "Loading available models…";
+"settings.choose_model" = "Choose a model";
+"settings.model_missing" = "Choose a model first.";
 "settings.deepseek_api_key" = "DeepSeek API Key";
 "settings.save_api_key" = "Save API Key";
 "settings.remove_api_key" = "Remove API Key";

@@ -40,6 +40,7 @@ public struct DeepSeekFIMRequest: Codable, Equatable, Sendable {
     public let temperature: Double
     public let stream: Bool
     public let streamOptions: StreamOptions?
+    public let stop: [String]?
 
     public struct StreamOptions: Codable, Equatable, Sendable {
         public let includeUsage: Bool
@@ -60,7 +61,8 @@ public struct DeepSeekFIMRequest: Codable, Equatable, Sendable {
         maxTokens: Int = 64,
         temperature: Double = 0.2,
         stream: Bool = true,
-        streamOptions: StreamOptions? = .init(includeUsage: true)
+        streamOptions: StreamOptions? = .init(includeUsage: true),
+        stop: [String]? = nil
     ) {
         self.model = model
         self.prompt = prompt
@@ -69,12 +71,41 @@ public struct DeepSeekFIMRequest: Codable, Equatable, Sendable {
         self.temperature = temperature
         self.stream = stream
         self.streamOptions = streamOptions
+        self.stop = stop
     }
 
     enum CodingKeys: String, CodingKey {
-        case model, prompt, suffix, temperature, stream
+        case model, prompt, suffix, temperature, stream, stop
         case maxTokens = "max_tokens"
         case streamOptions = "stream_options"
+    }
+}
+
+public struct DeepSeekModelList: Decodable, Sendable {
+    public struct Model: Decodable, Sendable {
+        public let id: String
+        public let object: String
+        public let ownedBy: String
+
+        enum CodingKeys: String, CodingKey {
+            case id, object
+            case ownedBy = "owned_by"
+        }
+    }
+
+    public let object: String
+    public let data: [Model]
+}
+
+public struct DeepSeekFIMUsage: Decodable, Sendable {
+    public let promptTokens: Int
+    public let completionTokens: Int
+    public let totalTokens: Int
+
+    enum CodingKeys: String, CodingKey {
+        case promptTokens = "prompt_tokens"
+        case completionTokens = "completion_tokens"
+        case totalTokens = "total_tokens"
     }
 }
 
@@ -84,6 +115,7 @@ public struct DeepSeekFIMStreamChunk: Decodable, Sendable {
     }
 
     public let choices: [Choice]
+    public let usage: DeepSeekFIMUsage?
 }
 
 public enum DeepSeekFIMSSEParserError: Error, Equatable {

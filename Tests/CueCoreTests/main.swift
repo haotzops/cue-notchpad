@@ -144,6 +144,15 @@ if let encodedRequest = try? JSONEncoder().encode(fimRequest),
     expect(false, "FIM request should encode")
 }
 
+let modelsJSON = """
+{"object":"list","data":[{"id":"deepseek-v4-pro","object":"model","owned_by":"deepseek"}]}
+"""
+if let modelList = try? JSONDecoder().decode(DeepSeekModelList.self, from: Data(modelsJSON.utf8)) {
+    expect(modelList.data.map(\.id) == ["deepseek-v4-pro"], "DeepSeek model list decoding")
+} else {
+    expect(false, "DeepSeek model list should decode")
+}
+
 var sseParser = DeepSeekFIMSSEParser()
 do {
     let partialEvents = try sseParser.append(Data("data: {\"choices\":[{\"text\":\"hel".utf8))

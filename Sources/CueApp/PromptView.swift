@@ -145,6 +145,7 @@ final class PromptPresentation: ObservableObject {
 
 struct PromptView: View {
     @ObservedObject var presentation: PromptPresentation
+    @ObservedObject private var usage = CueUsageStore.shared
     @ObservedObject var settings: CueSettings
     let screenGeometry: NotchScreenGeometry
     let onSubmit: () -> Void
@@ -254,6 +255,10 @@ struct PromptView: View {
                     .foregroundStyle(.white.opacity(0.18))
 
                 Text(tokenCount)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.28))
+
+                Text("FIM: \(usage.totals(from: .distantPast).total)")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.28))
 

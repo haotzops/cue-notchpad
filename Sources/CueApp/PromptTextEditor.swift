@@ -189,6 +189,7 @@ final class CueTextView: NSTextView {
     var onHide: (() -> Void)?
     var onOpenSettings: (() -> Void)?
     var onAcceptInlineCompletion: (() -> Bool)?
+    var onRequestInlineCompletion: (() -> Bool)?
     var onDismissInlineCompletion: (() -> Bool)?
     var inlineCompletion: CueInlineCompletion? { didSet { needsDisplay = true } }
 
@@ -200,7 +201,7 @@ final class CueTextView: NSTextView {
               completion.start <= string.utf16.count
         else { return }
 
-        let document = NSMutableAttributedString(string: string, attributes: [.font: font])
+        let document = NSMutableAttributedString(attributedString: textStorage ?? NSAttributedString(string: string, attributes: [.font: font]))
         let candidate = NSAttributedString(
             string: completion.text,
             attributes: [.font: font, .foregroundColor: NSColor.white.withAlphaComponent(0.36)]
@@ -213,9 +214,21 @@ final class CueTextView: NSTextView {
         scratchContainer.widthTracksTextView = container.widthTracksTextView
         manager.addTextContainer(scratchContainer)
         storage.addLayoutManager(manager)
-        let range = NSRange(location: completion.start, length: completion.text.utf16.count)
+        let redrawRange = NSRange(location: completion.start, length: document.length - completion.start)
         manager.ensureLayout(for: scratchContainer)
-        let glyphRange = manager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        let glyphRange = manager.glyphRange(forCharacterRange: redrawRange, actualCharacterRange: nil)
+        let startGlyph = manager.glyphIndexForCharacter(at: completion.start)
+        let start = startGlyph < manager.numberOfGlyphs
+            ? manager.location(forGlyphAt: startGlyph)
+            : manager.extraLineFragmentRect.origin
+        let redrawRect = NSRect(
+            x: start.x + textContainerInset.width,
+            y: start.y + textContainerInset.height,
+            width: bounds.maxX - start.x,
+            height: bounds.maxY - start.y
+        )
+        backgroundColor.setFill()
+        redrawRect.fill()
         manager.drawGlyphs(
             forGlyphRange: glyphRange,
             at: NSPoint(x: textContainerInset.width, y: textContainerInset.height)
@@ -243,7 +256,9 @@ final class CueTextView: NSTextView {
     override func keyDown(with event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let isReturn = event.keyCode == 36 || event.keyCode == 76
-        if event.keyCode == 48, flags.isEmpty, !hasMarkedText(), onAcceptInlineCompletion?() == true { return }
+        if event.keyCode == 48, flags.isEmpty, !hasMarkedText() {
+            if onAcceptInlineCompletion?() == true || onRequestInlineCompletion?() == true { return }
+        }
         if event.keyCode == 53, !hasMarkedText(), onDismissInlineCompletion?() == true { return }
         if event.keyCode == 43, flags == .command, !hasMarkedText() { onOpenSettings?(); return }
         if event.keyCode == 4, flags == .command, !hasMarkedText() { onHide?(); return }

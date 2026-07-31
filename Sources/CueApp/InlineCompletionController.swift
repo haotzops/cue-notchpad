@@ -26,6 +26,7 @@ final class InlineCompletionController {
         self.settings = settings
         textView.onAcceptInlineCompletion = { [weak self] in self?.accept() ?? false }
         textView.onDismissInlineCompletion = { [weak self] in self?.dismiss() ?? false }
+        textView.onRequestInlineCompletion = { [weak self] in self?.requestManually() ?? false }
     }
 
     func updateSettings(_ settings: CueSettings) {
@@ -47,9 +48,16 @@ final class InlineCompletionController {
         invalidate()
     }
 
-    private func scheduleIfEligible() {
+    private func requestManually() -> Bool {
+        guard let settings, settings.inlineCompletionEnabled else { return false }
+        scheduleIfEligible(force: true)
+        return true
+    }
+
+    private func scheduleIfEligible(force: Bool = false) {
         guard let textView, let settings,
               settings.inlineCompletionEnabled,
+              (force || settings.inlineCompletionTriggerMode != .manual),
               !textView.hasMarkedText(),
               textView.selectedRange().length == 0,
               !textView.string.isEmpty,
@@ -58,7 +66,9 @@ final class InlineCompletionController {
 
         let expectedRevision = revision
         debounceTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(200))
+            if !force {
+                try? await Task.sleep(for: .milliseconds(Int(settings.inlineCompletionDelayMilliseconds)))
+            }
             guard !Task.isCancelled else { return }
             self?.startRequest(expectedRevision: expectedRevision)
         }
@@ -74,7 +84,8 @@ final class InlineCompletionController {
                 selection: textView.selectedRange()
               ),
               !context.prefix.isEmpty,
-              let apiKey = try? CueKeychain.loadDeepSeekAPIKey()
+              let apiKey = try? CueKeychain.loadDeepSeekAPIKey(),
+              let model = settings.inlineCompletionModel
         else { return }
 
         requestID += 1
@@ -82,21 +93,31 @@ final class InlineCompletionController {
         let expectedSelection = textView.selectedRange()
         let request = InlineCompletionRequest(
             context: context,
-            model: "deepseek-v4-pro",
-            maxTokens: 64
+            model: model,
+            maxTokens: 256,
+            stop: settings.inlineCompletionMaximumLines == 1 ? ["\n"] : nil
         )
         requestTask = Task { [weak self, provider] in
             do {
                 var candidate = ""
-                for try await delta in await provider.streamCompletion(request, apiKey: apiKey) {
+                for try await event in await provider.streamCompletion(request, apiKey: apiKey) {
                     guard !Task.isCancelled else { return }
-                    candidate += delta
-                    self?.receive(
-                        candidate: candidate,
-                        requestID: expectedRequestID,
-                        revision: expectedRevision,
-                        selection: expectedSelection
-                    )
+                    switch event {
+                    case .text(let delta):
+                        candidate += delta
+                        self?.receive(
+                            candidate: candidate,
+                            requestID: expectedRequestID,
+                            revision: expectedRevision,
+                            selection: expectedSelection
+                        )
+                    case .usage(let usage):
+                        CueUsageStore.shared.recordFIM(
+                            model: request.model,
+                            inputTokens: usage.promptTokens,
+                            outputTokens: usage.completionTokens
+                        )
+                    }
                 }
             } catch is CancellationError {
                 // A newer edit or session change superseded this request.
@@ -115,7 +136,7 @@ final class InlineCompletionController {
               let settings, settings.inlineCompletionEnabled
         else { return }
 
-        let filtered = Self.filteredCandidate(candidate)
+        let filtered = Self.filteredCandidate(candidate, maximumLines: settings.inlineCompletionMaximumLines)
         guard !filtered.isEmpty else { return }
         textView.inlineCompletion = CueInlineCompletion(start: selection.location, text: filtered)
     }
@@ -180,9 +201,8 @@ final class InlineCompletionController {
         textView?.inlineCompletion = nil
     }
 
-    private static func filteredCandidate(_ candidate: String) -> String {
+    private static func filteredCandidate(_ candidate: String, maximumLines: Int) -> String {
         let maximumCharacters = 256
-        let maximumLines = 3
         guard !candidate.trimmingCharacters(in: .controlCharacters).isEmpty else { return "" }
         let lines = candidate.split(separator: "\n", omittingEmptySubsequences: false)
         let limitedLines = lines.prefix(maximumLines)

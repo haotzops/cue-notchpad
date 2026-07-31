@@ -5,10 +5,16 @@ struct InlineCompletionRequest: Sendable {
     let context: InlineCompletionContext
     let model: String
     let maxTokens: Int
+    let stop: [String]?
+}
+
+enum InlineCompletionEvent: Sendable {
+    case text(String)
+    case usage(DeepSeekFIMUsage)
 }
 
 protocol InlineCompletionProvider: Sendable {
-    func streamCompletion(_ request: InlineCompletionRequest, apiKey: String) async -> AsyncThrowingStream<String, Error>
+    func streamCompletion(_ request: InlineCompletionRequest, apiKey: String) async -> AsyncThrowingStream<InlineCompletionEvent, Error>
 }
 
 enum DeepSeekFIMError: LocalizedError {
@@ -26,18 +32,33 @@ enum DeepSeekFIMError: LocalizedError {
 actor DeepSeekFIMCompletionProvider: InlineCompletionProvider {
     private let session: URLSession
     private let endpoint = URL(string: "https://api.deepseek.com/beta/completions")!
+    private let modelsEndpoint = URL(string: "https://api.deepseek.com/models")!
 
     init(session: URLSession = .shared) {
         self.session = session
     }
 
-    func validate(apiKey: String) async throws {
+    func availableModels(apiKey: String) async throws -> [String] {
+        var urlRequest = URLRequest(url: modelsEndpoint)
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DeepSeekFIMError.invalidResponse
+        }
+        guard (200 ..< 300).contains(httpResponse.statusCode) else {
+            throw DeepSeekFIMError.httpStatus(httpResponse.statusCode)
+        }
+        let list = try JSONDecoder().decode(DeepSeekModelList.self, from: data)
+        return Array(Set(list.data.map(\.id).filter { !$0.isEmpty })).sorted()
+    }
+
+    func validate(apiKey: String, model: String) async throws {
         var urlRequest = URLRequest(url: endpoint)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         urlRequest.httpBody = try JSONEncoder().encode(DeepSeekFIMRequest(
-            model: "deepseek-v4-pro",
+            model: model,
             prompt: "Cue",
             suffix: "",
             maxTokens: 1,
@@ -53,7 +74,7 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider {
         }
     }
 
-    func streamCompletion(_ request: InlineCompletionRequest, apiKey: String) async -> AsyncThrowingStream<String, Error> {
+    func streamCompletion(_ request: InlineCompletionRequest, apiKey: String) async -> AsyncThrowingStream<InlineCompletionEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -65,7 +86,8 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider {
                         model: request.model,
                         prompt: request.context.prefix,
                         suffix: request.context.suffix,
-                        maxTokens: request.maxTokens
+                        maxTokens: request.maxTokens,
+                        stop: request.stop
                     ))
 
                     let (bytes, response) = try await session.bytes(for: urlRequest)
@@ -86,8 +108,9 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider {
                                 return
                             }
                             let chunk = try JSONDecoder().decode(DeepSeekFIMStreamChunk.self, from: Data(event.utf8))
+                            if let usage = chunk.usage { continuation.yield(.usage(usage)) }
                             for choice in chunk.choices {
-                                if let text = choice.text, !text.isEmpty { continuation.yield(text) }
+                                if let text = choice.text, !text.isEmpty { continuation.yield(.text(text)) }
                             }
                         }
                     }

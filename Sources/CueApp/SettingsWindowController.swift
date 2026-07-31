@@ -91,45 +91,87 @@ struct CueSettingsView: View {
                     isOn: $settings.inlineCompletionEnabled
                 )
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(localized(
-                        .settingsInlineCompletionHint,
-                        "When enabled, nearby prompt text is sent to DeepSeek FIM to generate a suggestion. Press Tab to accept it."
-                    ))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                if settings.inlineCompletionEnabled {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(localized(
+                            .settingsInlineCompletionHint,
+                            "When enabled, nearby prompt text is sent to DeepSeek FIM to generate a suggestion. Press Tab to accept it."
+                        ))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
 
-                    SecureField(
-                        localized(.settingsDeepSeekAPIKey, "DeepSeek API Key"),
-                        text: $deepSeekAPIKey
-                    )
-                    HStack {
-                        Button(localized(.settingsSaveAPIKey, "Save API Key")) {
-                            settings.saveDeepSeekAPIKey(deepSeekAPIKey)
-                            deepSeekAPIKey = ""
+                        HStack {
+                            Picker(
+                                localized(.settingsInlineCompletionModel, "Model"),
+                                selection: $settings.inlineCompletionModel
+                            ) {
+                                Text(localized(.settingsChooseModel, "Choose a model"))
+                                    .tag(String?.none)
+                                ForEach(settings.inlineCompletionModels, id: \.self) { model in
+                                    Text(model).tag(Optional(model))
+                                }
+                            }
+                            .disabled(!settings.inlineCompletionKeyConfigured || settings.isLoadingInlineCompletionModels)
+
+                            Button(localized(.settingsRefreshModels, "Refresh Models")) {
+                                settings.refreshDeepSeekModelsIfPossible()
+                            }
+                            .disabled(!settings.inlineCompletionKeyConfigured || settings.isLoadingInlineCompletionModels)
+
+                            if settings.isLoadingInlineCompletionModels {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
                         }
-                        .disabled(deepSeekAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                        Button(localized(.settingsTestAPIKey, "Test Connection")) {
-                            settings.testDeepSeekAPIKey()
+                        Picker("触发方式", selection: $settings.inlineCompletionTriggerMode) {
+                            Text("自动（Tab 可立即触发）").tag(InlineCompletionTriggerMode.automatic)
+                            Text("仅 Tab").tag(InlineCompletionTriggerMode.manual)
                         }
-                        .disabled(!settings.inlineCompletionKeyConfigured)
 
-                        Button(localized(.settingsRemoveAPIKey, "Remove API Key")) {
-                            settings.removeDeepSeekAPIKey()
+                        if settings.inlineCompletionTriggerMode != .manual {
+                            HStack {
+                                Text("自动触发延迟")
+                                TextField("ms", value: $settings.inlineCompletionDelayMilliseconds, format: .number.precision(.fractionLength(0)))
+                                    .frame(width: 72)
+                                Text("ms")
+                            }
                         }
-                        .disabled(!settings.inlineCompletionKeyConfigured)
 
-                        Text(settings.inlineCompletionKeyConfigured
-                            ? localized(.settingsAPIKeyConfigured, "Saved in Keychain")
-                            : localized(.settingsAPIKeyNotConfigured, "Not configured"))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    if let status = settings.inlineCompletionStatus {
-                        Text(status)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        Stepper("最大补全行数：\(settings.inlineCompletionMaximumLines)", value: $settings.inlineCompletionMaximumLines, in: 1 ... 100)
+
+                        SecureField(
+                            localized(.settingsDeepSeekAPIKey, "DeepSeek API Key"),
+                            text: $deepSeekAPIKey
+                        )
+                        HStack {
+                            Button(localized(.settingsSaveAPIKey, "Save API Key")) {
+                                settings.saveDeepSeekAPIKey(deepSeekAPIKey)
+                                deepSeekAPIKey = ""
+                            }
+                            .disabled(deepSeekAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                            Button(localized(.settingsTestAPIKey, "Test Connection")) {
+                                settings.testDeepSeekAPIKey()
+                            }
+                            .disabled(!settings.inlineCompletionKeyConfigured || settings.inlineCompletionModel == nil)
+
+                            Button(localized(.settingsRemoveAPIKey, "Remove API Key")) {
+                                settings.removeDeepSeekAPIKey()
+                            }
+                            .disabled(!settings.inlineCompletionKeyConfigured)
+
+                            Text(settings.inlineCompletionKeyConfigured
+                                ? localized(.settingsAPIKeyConfigured, "Saved in Keychain")
+                                : localized(.settingsAPIKeyNotConfigured, "Not configured"))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let status = settings.inlineCompletionStatus {
+                            Text(status)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
