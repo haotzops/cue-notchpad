@@ -17,7 +17,7 @@ let package = Package(
         .executableTarget(name: "cue", dependencies: ["CueCore"]),
         .executableTarget(name: "cue-host", dependencies: ["CueApp", "CueCore"]),
         .executableTarget(name: "CueCoreTests", dependencies: ["CueCore"], path: "Tests/CueCoreTests"),
-        .testTarget(name: "CueCoreXCTests", dependencies: ["CueCore"], path: "Tests/CueCoreXCTests"),
+        .testTarget(name: "CueCoreXCTests", dependencies: ["CueCore", "CueApp"], path: "Tests/CueCoreXCTests"),
     ],
     swiftLanguageModes: [.v5]
 )

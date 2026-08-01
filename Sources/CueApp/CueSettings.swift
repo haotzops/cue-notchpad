@@ -49,6 +49,8 @@ final class CueSettings: ObservableObject {
     static let defaultWindowHeight = 150.0
     static let minimumWindowHeight = 130.0
     static let defaultEditorFontSize = 16.0
+    /// Baseline schema for settings created by this and later releases.
+    static let persistenceSchemaVersion = 1
     static let minimumEditorFontSize = 8.0
     static let maximumEditorFontSize = 72.0
 
@@ -188,6 +190,9 @@ final class CueSettings: ObservableObject {
 
     init(deepSeekService: any DeepSeekService = DeepSeekFIMCompletionProvider()) {
         self.deepSeekService = deepSeekService
+        if Self.defaults.object(forKey: Keys.schemaVersion) == nil {
+            Self.defaults.set(Self.persistenceSchemaVersion, forKey: Keys.schemaVersion)
+        }
         Self.defaults.register(defaults: [
             Keys.language: CueLanguage.system.rawValue,
             Keys.windowWidth: Self.defaultWindowWidth,
@@ -361,6 +366,7 @@ final class CueSettings: ObservableObject {
     }
 
     private enum Keys {
+        static let schemaVersion = "cueSettingsSchemaVersion"
         static let language = "language"
         static let windowWidth = "windowWidth"
         static let windowHeight = "windowHeight"

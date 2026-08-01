@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "id": "A30E39C0-B730-43C2-92DB-55E308066C65",
+      "date": 0,
+      "kind": "fim",
+      "model": "example-model",
+      "inputTokens": 12,
+      "outputTokens": 34
+    }
+  ],
+  "cueOpenCount": 1,
+  "cueOpenDates": [0]
+}

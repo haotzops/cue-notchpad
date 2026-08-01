@@ -38,6 +38,14 @@ jobs:
           plutil -lint Sources/CueCore/Resources/en.lproj/Localizable.strings
           plutil -lint Sources/CueCore/Resources/zh-Hans.lproj/Localizable.strings
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Supporting/Info.plist)" = "io.github.haotzops.cue-notchpad"
+          test -f Docs/persistence-contract.md
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for name in ("config-v1.json", "usage-v1.json"):
+              document = json.loads((Path("Tests/Fixtures/Persistence") / name).read_text())
+              assert document["schemaVersion"] == 1, name
+          PY
 
       - name: Build debug products
         run: swift build
