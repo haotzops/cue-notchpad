@@ -35,6 +35,7 @@ jobs:
           compile(Path("Scripts/generate-tokenizer-index.py").read_text(), "generate-tokenizer-index.py", "exec")
           PY
           plutil -lint Supporting/Info.plist
+          swift -e 'import XCTest'
           plutil -lint Sources/CueCore/Resources/en.lproj/Localizable.strings
           plutil -lint Sources/CueCore/Resources/zh-Hans.lproj/Localizable.strings
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Supporting/Info.plist)" = "io.github.haotzops.cue-notchpad"
