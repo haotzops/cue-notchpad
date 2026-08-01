@@ -64,7 +64,7 @@ cue --wait
 - `⌥⌘ ←` / `⌥⌘ →`：切换上一个/下一个并发会话（可在设置中修改）
 - 在“设置 → 编辑器 → 编辑器字体”中可使用 macOS 原生字体面板选择字体和字号；安装 Nerd Font 后可选择相应字体显示其私有区图标。
 - 在“设置 → 编辑器”中可开启“中英文之间自动加空格”；开启后仅在提交 prompt 时处理相邻的中文与英文/数字，不影响编辑过程或取消操作。
-- 在“设置 → 编辑器”中可启用 DeepSeek 行间补全：将 API Key 保存到本地配置文件（或设置 `CUE_DEEPSEEK_API_KEY` 环境变量）后，Cue 会通过 DeepSeek 官方 `GET /models` 接口获取可选模型；必须从返回的列表中自行选择模型；选择后，光标附近的 prompt 文本会发送给 DeepSeek FIM 生成半透明建议。按 `⇧Tab` 手动触发、按 `Tab` 接受建议，按 `Esc` 先关闭建议。该功能默认关闭，候选在接受前不会写入或提交。
+- 在“设置 → 编辑器”中可启用 DeepSeek 行间补全：API Key 保存在当前用户的 `~/Library/Application Support/Cue Notchpad/config.json`（权限 `0600`），也可用 `CUE_DEEPSEEK_API_KEY` 环境变量覆盖。启用后，光标附近的 prompt 前缀与后缀会发送到 DeepSeek FIM Beta API，以 `deepseek-v4-pro` 生成半透明建议；该调用可能产生 DeepSeek 账户费用。按 `⇧Tab` 手动触发、按 `Tab` 接受建议，按 `Esc` 先关闭建议。该功能默认关闭，候选在接受前不会写入或提交。协议行为以 [FIM 指南](https://api-docs.deepseek.com/zh-cn/guides/fim_completion) 和 [FIM API](https://api-docs.deepseek.com/zh-cn/api/create-completion) 为准。
 - `⌘ ,`：打开设置窗口
 - 项目内置 Pi 扩展 `.pi/extensions/cue-pi-context.ts`：在 Pi 中运行 `/cue [草稿]` 可显式打开 Cue，并以带边界标记的格式附带最近 20 条会话记录；确认提交后内容会作为 Pi follow-up 发送。该扩展不会自动发送会话内容。
 - 普通 `Return`：在 prompt 中换行

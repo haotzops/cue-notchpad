@@ -7,6 +7,7 @@ build: tokenizer
 	swift build
 
 test: tokenizer
+	swift test
 	swift run cue-core-tests
 
 app:
