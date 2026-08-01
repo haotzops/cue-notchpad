@@ -13,7 +13,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "CueCore", resources: [.process("Resources")]),
-        .target(name: "CueApp", dependencies: ["CueCore"]),
+        .target(name: "CueApp", dependencies: ["CueCore"], resources: [.copy("../../Supporting/logo.svg")]),
         .executableTarget(name: "cue", dependencies: ["CueCore"]),
         .executableTarget(name: "cue-host", dependencies: ["CueApp", "CueCore"]),
         .executableTarget(name: "CueCoreTests", dependencies: ["CueCore"], path: "Tests/CueCoreTests"),

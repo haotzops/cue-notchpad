@@ -226,15 +226,14 @@ struct PromptView: View {
     private var editorContent: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Circle()
-                    .fill(Color(red: 0.96, green: 0.69, blue: 0.25))
-                    .frame(width: 7, height: 7)
-                    .shadow(color: Color.orange.opacity(0.65), radius: 4)
+                CueBrandMark()
 
-                Text(presentation.sourceName ?? "CUE")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .tracking(1.8)
-                    .foregroundStyle(sourceColor.opacity(0.85))
+                if let sourceName = presentation.sourceName {
+                    Text("· \(sourceName)")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .tracking(0.8)
+                        .foregroundStyle(sourceColor.opacity(0.75))
+                }
 
                 Spacer()
 

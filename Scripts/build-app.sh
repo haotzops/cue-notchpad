@@ -81,7 +81,7 @@ for resource_bundle in "$RESOURCE_BIN_DIR"/CueNotchpad_*.bundle; do
     for localization in "$resource_bundle"/*.lproj; do
         cp -R "$localization" "$APP/Contents/Resources/"
     done
-    for resource in "$resource_bundle"/*.cuebpe; do
+    for resource in "$resource_bundle"/*.cuebpe "$resource_bundle"/*.svg; do
         cp "$resource" "$APP/Contents/Resources/"
     done
 done
