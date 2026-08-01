@@ -52,6 +52,8 @@ final class CueSettings: ObservableObject {
     static let minimumEditorFontSize = 8.0
     static let maximumEditorFontSize = 72.0
 
+    private let deepSeekService: any DeepSeekService
+
     @Published var language: CueLanguage {
         didSet { Self.defaults.set(language.rawValue, forKey: Keys.language) }
     }
@@ -184,7 +186,8 @@ final class CueSettings: ObservableObject {
         .systemFont(ofSize: CGFloat(defaultEditorFontSize), weight: .regular)
     }
 
-    init() {
+    init(deepSeekService: any DeepSeekService = DeepSeekFIMCompletionProvider()) {
+        self.deepSeekService = deepSeekService
         Self.defaults.register(defaults: [
             Keys.language: CueLanguage.system.rawValue,
             Keys.windowWidth: Self.defaultWindowWidth,
@@ -277,7 +280,8 @@ final class CueSettings: ObservableObject {
         Task { @MainActor [weak self] in
             defer { self?.isTestingInlineCompletionConnection = false }
             do {
-                try await DeepSeekFIMCompletionProvider().validate(apiKey: apiKey, model: model)
+                guard let service = self?.deepSeekService else { return }
+                try await service.validate(apiKey: apiKey, model: model)
                 self?.setInlineCompletionStatus(.settingsAPIKeyValid)
             } catch {
                 self?.setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
@@ -292,7 +296,8 @@ final class CueSettings: ObservableObject {
         Task { @MainActor [weak self] in
             defer { self?.isLoadingInlineCompletionModels = false }
             do {
-                let models = try await DeepSeekFIMCompletionProvider().availableModels(apiKey: apiKey)
+                guard let service = self?.deepSeekService else { return }
+                let models = try await service.availableModels(apiKey: apiKey)
                 guard !models.isEmpty else {
                     self?.setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
                     return

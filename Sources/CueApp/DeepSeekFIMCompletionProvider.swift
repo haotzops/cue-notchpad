@@ -18,6 +18,11 @@ protocol InlineCompletionProvider: Sendable {
     func streamCompletion(_ request: InlineCompletionRequest, apiKey: String) async -> AsyncThrowingStream<InlineCompletionEvent, Error>
 }
 
+protocol DeepSeekService: Sendable {
+    func availableModels(apiKey: String) async throws -> [String]
+    func validate(apiKey: String, model: String) async throws
+}
+
 enum DeepSeekFIMError: LocalizedError, Equatable, Sendable {
     case invalidResponse
     case unsupportedModel
@@ -32,7 +37,7 @@ enum DeepSeekFIMError: LocalizedError, Equatable, Sendable {
     }
 }
 
-actor DeepSeekFIMCompletionProvider: InlineCompletionProvider {
+actor DeepSeekFIMCompletionProvider: InlineCompletionProvider, DeepSeekService {
     private let session: URLSession
     private let endpoint = URL(string: "https://api.deepseek.com/beta/completions")!
     private let modelsEndpoint = URL(string: "https://api.deepseek.com/models")!
