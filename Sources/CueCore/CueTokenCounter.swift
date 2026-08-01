@@ -5,12 +5,12 @@ import Foundation
 public final class CueTokenCounter: @unchecked Sendable {
     public static let shared = CueTokenCounter()
 
-    private let vocabulary: CueTokenVocabulary
-    private let pattern: Regex<AnyRegexOutput>
+    private let vocabulary: CueTokenVocabulary?
+    private let pattern: Regex<AnyRegexOutput>?
 
     private init() {
         vocabulary = CueTokenVocabulary.loadBundled()
-        pattern = try! Regex(
+        pattern = try? Regex(
             #"'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s+$|\s*[\r\n]|\s+(?!\S)|\s"#
         )
     }
@@ -28,6 +28,7 @@ public final class CueTokenCounter: @unchecked Sendable {
     ) -> Int? {
         guard !shouldCancel() else { return nil }
         guard !text.isEmpty else { return 0 }
+        guard let vocabulary, let pattern else { return nil }
 
         return vocabulary.withLookup { lookup in
             var result = 0
@@ -101,10 +102,8 @@ private final class CueTokenVocabulary {
     private let blobOffset: Int
     private let blobSize: Int
 
-    private init(storage: Data) {
-        guard storage.count >= Self.headerSize else {
-            preconditionFailure("Bundled cl100k index has an invalid header")
-        }
+    private init?(storage: Data) {
+        guard storage.count >= Self.headerSize else { return nil }
 
         let header = storage.withUnsafeBytes { bytes -> Header in
             Header(
@@ -134,9 +133,7 @@ private final class CueTokenVocabulary {
               blobOffset <= storage.count,
               blobSize <= storage.count - blobOffset,
               blobOffset + blobSize == storage.count
-        else {
-            preconditionFailure("Bundled cl100k index is invalid")
-        }
+        else { return nil }
 
         self.storage = storage
         self.bucketCount = bucketCount
@@ -146,7 +143,7 @@ private final class CueTokenVocabulary {
         self.blobSize = blobSize
     }
 
-    static func loadBundled() -> CueTokenVocabulary {
+    static func loadBundled() -> CueTokenVocabulary? {
         let bundle = CueResources.bundle
         let url = bundle.url(
             forResource: "cl100k_base",
@@ -156,9 +153,7 @@ private final class CueTokenVocabulary {
 
         guard let url,
               let data = try? Data(contentsOf: url, options: [.mappedIfSafe])
-        else {
-            preconditionFailure("Bundled cl100k index is missing")
-        }
+        else { return nil }
         return CueTokenVocabulary(storage: data)
     }
 
