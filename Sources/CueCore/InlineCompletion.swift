@@ -32,6 +32,16 @@ public enum InlineCompletionContextBuilder {
     }
 }
 
+public enum DeepSeekFIM {
+    public static let model = "deepseek-v4-pro"
+    public static let defaultMaximumTokens = 64
+    public static let maximumTokens = 4_096
+
+    public static func supports(model: String) -> Bool {
+        model == Self.model
+    }
+}
+
 public struct DeepSeekFIMRequest: Codable, Equatable, Sendable {
     public let model: String
     public let prompt: String
@@ -49,16 +59,14 @@ public struct DeepSeekFIMRequest: Codable, Equatable, Sendable {
             self.includeUsage = includeUsage
         }
 
-        enum CodingKeys: String, CodingKey {
-            case includeUsage = "include_usage"
-        }
+        enum CodingKeys: String, CodingKey { case includeUsage = "include_usage" }
     }
 
     public init(
         model: String,
         prompt: String,
         suffix: String,
-        maxTokens: Int = 64,
+        maxTokens: Int = DeepSeekFIM.defaultMaximumTokens,
         temperature: Double = 0.2,
         stream: Bool = true,
         streamOptions: StreamOptions? = .init(includeUsage: true),
@@ -67,11 +75,11 @@ public struct DeepSeekFIMRequest: Codable, Equatable, Sendable {
         self.model = model
         self.prompt = prompt
         self.suffix = suffix
-        self.maxTokens = maxTokens
-        self.temperature = temperature
+        self.maxTokens = min(max(maxTokens, 1), DeepSeekFIM.maximumTokens)
+        self.temperature = min(max(temperature, 0), 2)
         self.stream = stream
         self.streamOptions = streamOptions
-        self.stop = stop
+        self.stop = stop.map { Array($0.prefix(16)) }
     }
 
     enum CodingKeys: String, CodingKey {
@@ -86,13 +94,8 @@ public struct DeepSeekModelList: Decodable, Sendable {
         public let id: String
         public let object: String
         public let ownedBy: String
-
-        enum CodingKeys: String, CodingKey {
-            case id, object
-            case ownedBy = "owned_by"
-        }
+        enum CodingKeys: String, CodingKey { case id, object; case ownedBy = "owned_by" }
     }
-
     public let object: String
     public let data: [Model]
 }
@@ -101,7 +104,6 @@ public struct DeepSeekFIMUsage: Decodable, Sendable {
     public let promptTokens: Int
     public let completionTokens: Int
     public let totalTokens: Int
-
     enum CodingKeys: String, CodingKey {
         case promptTokens = "prompt_tokens"
         case completionTokens = "completion_tokens"
@@ -112,51 +114,46 @@ public struct DeepSeekFIMUsage: Decodable, Sendable {
 public struct DeepSeekFIMStreamChunk: Decodable, Sendable {
     public struct Choice: Decodable, Sendable {
         public let text: String?
+        public let finishReason: String?
+        enum CodingKeys: String, CodingKey { case text; case finishReason = "finish_reason" }
     }
-
     public let choices: [Choice]
     public let usage: DeepSeekFIMUsage?
 }
 
-public enum DeepSeekFIMSSEParserError: Error, Equatable {
-    case invalidEvent
-}
+public enum DeepSeekFIMSSEParserError: Error, Equatable { case invalidEvent }
 
-/// A byte-buffering SSE parser. Network chunks are not guaranteed to line up
-/// with SSE events or UTF-8 scalar boundaries, so parsing happens only after a
-/// complete blank-line-delimited event is buffered.
+/// Incrementally parses SSE lines. This handles arbitrary network boundaries
+/// without rescanning the complete buffered response for every incoming byte.
 public struct DeepSeekFIMSSEParser: Sendable {
-    private var buffer = Data()
+    private var line = Data()
+    private var payloadLines = [String]()
 
     public init() {}
 
     public mutating func append(_ data: Data) throws -> [String] {
-        buffer.append(data)
-        var events: [String] = []
-
-        while let range = eventTerminator(in: buffer) {
-            let eventData = buffer.subdata(in: 0 ..< range.lowerBound)
-            buffer.removeSubrange(0 ..< range.upperBound)
-            guard let event = String(data: eventData, encoding: .utf8) else {
-                throw DeepSeekFIMSSEParserError.invalidEvent
-            }
-
-            let payload = event
-                .split(whereSeparator: \.isNewline)
-                .compactMap { line -> String? in
-                    guard line.hasPrefix("data:") else { return nil }
-                    return String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+        var events = [String]()
+        for byte in data {
+            if byte == 0x0A {
+                if line.last == 0x0D { line.removeLast() }
+                if line.isEmpty {
+                    if !payloadLines.isEmpty {
+                        events.append(payloadLines.joined(separator: "\n"))
+                        payloadLines.removeAll(keepingCapacity: true)
+                    }
+                } else {
+                    guard let value = String(data: line, encoding: .utf8) else {
+                        throw DeepSeekFIMSSEParserError.invalidEvent
+                    }
+                    if value.hasPrefix("data:") {
+                        payloadLines.append(String(value.dropFirst(5)).trimmingCharacters(in: .whitespaces))
+                    }
                 }
-                .joined(separator: "\n")
-            if !payload.isEmpty { events.append(payload) }
+                line.removeAll(keepingCapacity: true)
+            } else {
+                line.append(byte)
+            }
         }
         return events
-    }
-
-    private func eventTerminator(in data: Data) -> Range<Int>? {
-        let lf = Data([0x0A, 0x0A])
-        if let range = data.range(of: lf) { return range }
-        let crlf = Data([0x0D, 0x0A, 0x0D, 0x0A])
-        return data.range(of: crlf)
     }
 }

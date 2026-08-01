@@ -112,7 +112,7 @@ final class InlineCompletionController {
         let request = InlineCompletionRequest(
             context: context,
             model: model,
-            maxTokens: 256,
+            maxTokens: DeepSeekFIM.defaultMaximumTokens,
             stop: settings.inlineCompletionMaximumLines == 1 ? ["\n"] : nil
         )
         requestTask = Task { [weak self, provider] in
@@ -136,6 +136,8 @@ final class InlineCompletionController {
                             outputTokens: usage.completionTokens
                         )
                         self?.onUsage?(usage.promptTokens, usage.completionTokens)
+                    case .finished:
+                        break
                     }
                 }
             } catch is CancellationError {

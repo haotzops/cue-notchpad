@@ -184,16 +184,20 @@ expect(inlineContext?.prefix == "你好 👨‍👩‍👧‍👦hello", "inline
 expect(inlineContext?.suffix == "世界", "inline completion suffix")
 expect(InlineCompletionContextBuilder.make(document: inlineDocument, selection: NSRange(location: 1, length: 1)) == nil, "inline completion rejects selected text")
 
+expect(DeepSeekFIM.supports(model: "deepseek-v4-pro"), "official FIM model is accepted")
+expect(!DeepSeekFIM.supports(model: "other-model"), "unsupported FIM model is rejected")
 let fimRequest = DeepSeekFIMRequest(model: "deepseek-v4-pro", prompt: "before", suffix: "after")
 if let encodedRequest = try? JSONEncoder().encode(fimRequest),
    let requestObject = try? JSONSerialization.jsonObject(with: encodedRequest) as? [String: Any]
 {
-    expect(requestObject["max_tokens"] as? Int == 64, "FIM request max_tokens encoding")
+    expect(requestObject["max_tokens"] as? Int == DeepSeekFIM.defaultMaximumTokens, "FIM request max_tokens encoding")
     expect(requestObject["stream"] as? Bool == true, "FIM request streaming encoding")
     expect((requestObject["stream_options"] as? [String: Any])?["include_usage"] as? Bool == true, "FIM usage stream option")
 } else {
     expect(false, "FIM request should encode")
 }
+let clampedFIMRequest = DeepSeekFIMRequest(model: "deepseek-v4-pro", prompt: "a", suffix: "", maxTokens: 9_999)
+expect(clampedFIMRequest.maxTokens == DeepSeekFIM.maximumTokens, "FIM request limits max_tokens to the documented maximum")
 
 let modelsJSON = """
 {"object":"list","data":[{"id":"deepseek-v4-pro","object":"model","owned_by":"deepseek"}]}
@@ -208,8 +212,10 @@ var sseParser = DeepSeekFIMSSEParser()
 do {
     let partialEvents = try sseParser.append(Data("data: {\"choices\":[{\"text\":\"hel".utf8))
     expect(partialEvents.isEmpty, "SSE partial event waits for terminator")
-    let events = try sseParser.append(Data("lo\"}]}\n\ndata: [DONE]\n\n".utf8))
-    expect(events == ["{\"choices\":[{\"text\":\"hello\"}]}", "[DONE]"], "SSE parser combines chunked events")
+    let events = try sseParser.append(Data("lo\",\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n".utf8))
+    expect(events == ["{\"choices\":[{\"text\":\"hello\",\"finish_reason\":\"stop\"}]}", "[DONE]"], "SSE parser combines chunked events")
+    let chunk = try JSONDecoder().decode(DeepSeekFIMStreamChunk.self, from: Data(events[0].utf8))
+    expect(chunk.choices.first?.finishReason == "stop", "SSE chunk decodes finish reason")
 } catch {
     expect(false, "SSE parser should parse: \(error)")
 }

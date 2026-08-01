@@ -11,19 +11,22 @@ struct InlineCompletionRequest: Sendable {
 enum InlineCompletionEvent: Sendable {
     case text(String)
     case usage(DeepSeekFIMUsage)
+    case finished(reason: String?)
 }
 
 protocol InlineCompletionProvider: Sendable {
     func streamCompletion(_ request: InlineCompletionRequest, apiKey: String) async -> AsyncThrowingStream<InlineCompletionEvent, Error>
 }
 
-enum DeepSeekFIMError: LocalizedError {
+enum DeepSeekFIMError: LocalizedError, Equatable, Sendable {
     case invalidResponse
+    case unsupportedModel
     case httpStatus(Int)
 
     var errorDescription: String? {
         switch self {
         case .invalidResponse: "The completion service returned an invalid response."
+        case .unsupportedModel: "The selected model does not support DeepSeek FIM."
         case .httpStatus(let status): "The completion service returned HTTP \(status)."
         }
     }
@@ -35,30 +38,30 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider {
     private let modelsEndpoint = URL(string: "https://api.deepseek.com/models")!
     private let chatEndpoint = URL(string: "https://api.deepseek.com/chat/completions")!
 
-    init(session: URLSession = .shared) {
-        self.session = session
+    init(session: URLSession? = nil) {
+        if let session {
+            self.session = session
+        } else {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.timeoutIntervalForRequest = 30
+            configuration.timeoutIntervalForResource = 60
+            self.session = URLSession(configuration: configuration)
+        }
     }
 
     func availableModels(apiKey: String) async throws -> [String] {
-        var urlRequest = URLRequest(url: modelsEndpoint)
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await session.data(for: urlRequest)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DeepSeekFIMError.invalidResponse
-        }
-        guard (200 ..< 300).contains(httpResponse.statusCode) else {
-            throw DeepSeekFIMError.httpStatus(httpResponse.statusCode)
-        }
+        var request = URLRequest(url: modelsEndpoint)
+        request.timeoutInterval = 30
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        try validate(response)
         let list = try JSONDecoder().decode(DeepSeekModelList.self, from: data)
-        return Array(Set(list.data.map(\.id).filter { !$0.isEmpty })).sorted()
+        return list.data.map(\.id).filter(DeepSeekFIM.supports(model:))
     }
 
     func validate(apiKey: String, model: String) async throws {
-        var urlRequest = URLRequest(url: endpoint)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        urlRequest.httpBody = try JSONEncoder().encode(DeepSeekFIMRequest(
+        guard DeepSeekFIM.supports(model: model) else { throw DeepSeekFIMError.unsupportedModel }
+        var request = makeFIMRequest(apiKey: apiKey, body: DeepSeekFIMRequest(
             model: model,
             prompt: "Cue",
             suffix: "",
@@ -66,28 +69,27 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider {
             stream: false,
             streamOptions: nil
         ))
-        let (_, response) = try await session.data(for: urlRequest)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DeepSeekFIMError.invalidResponse
-        }
-        guard (200 ..< 300).contains(httpResponse.statusCode) else {
-            throw DeepSeekFIMError.httpStatus(httpResponse.statusCode)
-        }
+        request.timeoutInterval = 30
+        let (_, response) = try await session.data(for: request)
+        try validate(response)
     }
 
     func expandPrompt(_ text: String, instruction: String, model: String, apiKey: String) async throws -> String {
         var request = URLRequest(url: chatEndpoint)
         request.httpMethod = "POST"
+        request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "messages": [["role": "system", "content": instruction], ["role": "user", "content": text]], "stream": false])
+        request.httpBody = try JSONEncoder().encode(DeepSeekChatRequest(
+            model: model,
+            messages: [.init(role: "system", content: instruction), .init(role: "user", content: text)]
+        ))
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw DeepSeekFIMError.invalidResponse }
-        guard (200..<300).contains(http.statusCode) else { throw DeepSeekFIMError.httpStatus(http.statusCode) }
-        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let choices = object?["choices"] as? [[String: Any]]
-        let message = choices?.first?["message"] as? [String: Any]
-        guard let content = message?["content"] as? String, !content.isEmpty else { throw DeepSeekFIMError.invalidResponse }
+        try validate(response)
+        let completion = try JSONDecoder().decode(DeepSeekChatCompletion.self, from: data)
+        guard let content = completion.choices.first?.message.content, !content.isEmpty else {
+            throw DeepSeekFIMError.invalidResponse
+        }
         return content
     }
 
@@ -95,42 +97,29 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    var urlRequest = URLRequest(url: endpoint)
-                    urlRequest.httpMethod = "POST"
-                    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-                    urlRequest.httpBody = try JSONEncoder().encode(DeepSeekFIMRequest(
+                    guard DeepSeekFIM.supports(model: request.model) else {
+                        throw DeepSeekFIMError.unsupportedModel
+                    }
+                    let body = DeepSeekFIMRequest(
                         model: request.model,
                         prompt: request.context.prefix,
                         suffix: request.context.suffix,
                         maxTokens: request.maxTokens,
                         stop: request.stop
-                    ))
-
-                    let (bytes, response) = try await session.bytes(for: urlRequest)
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        throw DeepSeekFIMError.invalidResponse
-                    }
-                    guard (200 ..< 300).contains(httpResponse.statusCode) else {
-                        throw DeepSeekFIMError.httpStatus(httpResponse.statusCode)
-                    }
+                    )
+                    let (bytes, response) = try await session.bytes(for: makeFIMRequest(apiKey: apiKey, body: body))
+                    try validate(response)
 
                     var parser = DeepSeekFIMSSEParser()
+                    var packet = Data()
                     for try await byte in bytes {
                         try Task.checkCancellation()
-                        let events = try parser.append(Data([byte]))
-                        for event in events {
-                            if event == "[DONE]" {
-                                continuation.finish()
-                                return
-                            }
-                            let chunk = try JSONDecoder().decode(DeepSeekFIMStreamChunk.self, from: Data(event.utf8))
-                            if let usage = chunk.usage { continuation.yield(.usage(usage)) }
-                            for choice in chunk.choices {
-                                if let text = choice.text, !text.isEmpty { continuation.yield(.text(text)) }
-                            }
-                        }
+                        packet.append(byte)
+                        guard byte == 0x0A else { continue }
+                        try emit(parser.append(packet), to: continuation)
+                        packet.removeAll(keepingCapacity: true)
                     }
+                    if !packet.isEmpty { try emit(parser.append(packet), to: continuation) }
                     continuation.finish()
                 } catch is CancellationError {
                     continuation.finish()
@@ -142,4 +131,52 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider {
         }
     }
 
+    private func makeFIMRequest(apiKey: String, body: DeepSeekFIMRequest) -> URLRequest {
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 30
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONEncoder().encode(body)
+        return request
+    }
+
+    private func validate(_ response: URLResponse) throws {
+        guard let http = response as? HTTPURLResponse else { throw DeepSeekFIMError.invalidResponse }
+        guard (200 ..< 300).contains(http.statusCode) else { throw DeepSeekFIMError.httpStatus(http.statusCode) }
+    }
+
+    private func emit(
+        _ events: [String],
+        to continuation: AsyncThrowingStream<InlineCompletionEvent, Error>.Continuation
+    ) throws {
+        for event in events {
+            if event == "[DONE]" {
+                continuation.finish()
+                return
+            }
+            let chunk = try JSONDecoder().decode(DeepSeekFIMStreamChunk.self, from: Data(event.utf8))
+            if let usage = chunk.usage { continuation.yield(.usage(usage)) }
+            for choice in chunk.choices {
+                if let text = choice.text, !text.isEmpty { continuation.yield(.text(text)) }
+                if choice.finishReason != nil { continuation.yield(.finished(reason: choice.finishReason)) }
+            }
+        }
+    }
+}
+
+private struct DeepSeekChatRequest: Encodable {
+    struct Message: Encodable { let role: String; let content: String }
+    let model: String
+    let messages: [Message]
+    let stream = false
+}
+
+private struct DeepSeekChatCompletion: Decodable {
+    struct Choice: Decodable {
+        struct Message: Decodable { let content: String? }
+        let message: Message
+    }
+    let choices: [Choice]
 }
