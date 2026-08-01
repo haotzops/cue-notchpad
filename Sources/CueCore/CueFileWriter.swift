@@ -30,8 +30,8 @@ public enum CueFileWriter {
         return try CueFileSnapshot(url: targetURL, contents: Data(contentsOf: targetURL))
     }
 
-    /// Atomically replaces `url` only when it still contains `snapshot`.
-    /// `replaceItemAt` preserves the destination item's metadata on macOS,
+    /// Atomically replaces the snapshot target only when it still contains the
+    /// original bytes. `replaceItemAt` preserves destination metadata on macOS,
     /// including its permissions and extended attributes.
     public static func replace(
         with text: String,

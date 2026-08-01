@@ -37,10 +37,13 @@ let temporaryFile = temporaryDirectory.appendingPathComponent("prompt.txt")
 do {
     try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
     try Data("before".utf8).write(to: temporaryFile)
+    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: temporaryFile.path)
     let snapshot = try CueFileWriter.snapshot(at: temporaryFile)
     try CueFileWriter.replace(with: "after", matching: snapshot)
     let writtenText = try String(contentsOf: temporaryFile, encoding: .utf8)
     expect(writtenText == "after", "file writer replaces unchanged file")
+    let permissions = try FileManager.default.attributesOfItem(atPath: temporaryFile.path)[.posixPermissions] as? NSNumber
+    expect(permissions?.intValue == 0o600, "file writer preserves permissions")
     try Data("external".utf8).write(to: temporaryFile)
     do {
         try CueFileWriter.replace(with: "lost", matching: snapshot)
