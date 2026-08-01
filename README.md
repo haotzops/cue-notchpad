@@ -1,7 +1,7 @@
 # Cue Notchpad
 
 <p align="center">
-  <img src="Supporting/cue-logo.png" alt="Cue Notchpad Logo" width="220">
+  <img src="logo.svg" alt="Cue Notchpad Logo" width="220">
 </p>
 
 Cue Notchpad 只做一件事，替代你的 `code --wait`/`cot --wait` 作为外挂 prompt 编辑器。安装后，你只需要在各类 agent 工具的配置文件中，将 editor 配置为 `cue --wait`。在会话中，使用 `Control-G` 即可弹出 Cue 编辑器。
