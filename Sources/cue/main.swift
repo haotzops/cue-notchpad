@@ -33,6 +33,32 @@ private func launchHost() {
     let process = Process(); process.executableURL = URL(fileURLWithPath: "/usr/bin/open"); process.arguments = ["-a", app.path]
     try? process.run()
 }
+private func callerName() -> String? {
+    var pid = getppid()
+    for _ in 0..<8 {
+        var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        let length = proc_pidpath(pid, &path, UInt32(path.count))
+        if length > 0 {
+            let name = URL(fileURLWithPath: String(cString: path)).lastPathComponent
+            if ["pi", "codex", "opencode", "claude", "gemini"].contains(where: { name.lowercased().contains($0) }) {
+                return name.capitalized
+            }
+        }
+
+        var info = proc_bsdinfo()
+        guard proc_pidinfo(
+            pid,
+            PROC_PIDTBSDINFO,
+            0,
+            &info,
+            Int32(MemoryLayout<proc_bsdinfo>.size)
+        ) == MemoryLayout<proc_bsdinfo>.size,
+        info.pbi_ppid > 0
+        else { break }
+        pid = Int32(info.pbi_ppid)
+    }
+    return nil
+}
 
 signal(SIGPIPE, SIG_IGN)
 let args: CueArguments
@@ -57,7 +83,7 @@ do {
     }
 } catch { stderr("cue: cannot read file: \(error)"); exit(EXIT_FAILURE) }
 let document: CueDocument = args.filePath.map { .file(path: $0) } ?? .standardInput
-let request = CueSessionRequest(initialText: input, document: document, callerPID: getppid(), callerName: nil, workingDirectory: FileManager.default.currentDirectoryPath)
+let request = CueSessionRequest(initialText: input, document: document, callerPID: getppid(), callerName: callerName(), workingDirectory: FileManager.default.currentDirectoryPath)
 var connection = connectSocket()
 if connection == nil {
     launchHost()
