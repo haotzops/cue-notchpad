@@ -39,7 +39,7 @@ jobs:
           plutil -lint Sources/CueCore/Resources/en.lproj/Localizable.strings
           plutil -lint Sources/CueCore/Resources/zh-Hans.lproj/Localizable.strings
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Supporting/Info.plist)" = "io.github.haotzops.cue-notchpad"
-          test -f Docs/persistence-contract.md
+          test -f AGENTS.md
           python3 - <<'PY'
           import json
           from pathlib import Path
