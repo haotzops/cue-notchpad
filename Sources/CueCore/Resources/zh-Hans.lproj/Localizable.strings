@@ -4,6 +4,7 @@
 "action.done" = "完成";
 "character_count.format" = "字符: %lld";
 "token_count.format" = "token: %lld";
+"token_count.unavailable" = "token: 不可用";
 "error.no_display" = "cue：没有可用的显示器";
 "settings.title" = "设置";
 "settings.menu_title" = "设置…";

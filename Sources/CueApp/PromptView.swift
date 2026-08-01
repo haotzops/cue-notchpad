@@ -29,7 +29,7 @@ final class PromptModel: ObservableObject {
     @Published private(set) var text: String {
         didSet { scheduleTokenCount() }
     }
-    @Published var tokenCount = 0
+    @Published var tokenCount: Int? = 0
     @Published private(set) var fimInputTokens = 0
     @Published private(set) var fimOutputTokens = 0
     @Published private(set) var editorContentHeight: CGFloat = 42
@@ -70,6 +70,10 @@ final class PromptModel: ObservableObject {
         guard !snapshot.isEmpty else {
             tokenRequest = nil
             tokenCount = 0
+            return
+        }
+        guard CueTokenCounter.shared.isAvailable else {
+            tokenCount = nil
             return
         }
 
@@ -325,7 +329,10 @@ struct PromptView: View {
     }
 
     private var tokenCount: String {
-        CueLocalization.tokenCount(presentation.model.tokenCount, localization: localization)
+        guard let count = presentation.model.tokenCount else {
+            return localized(.tokenUnavailable)
+        }
+        return CueLocalization.tokenCount(count, localization: localization)
     }
 
     private func localized(_ key: CueLocalizedKey) -> String {

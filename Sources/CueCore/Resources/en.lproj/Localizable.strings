@@ -4,6 +4,7 @@
 "action.done" = "done";
 "character_count.format" = "ch: %lld";
 "token_count.format" = "token: %lld";
+"token_count.unavailable" = "token: unavailable";
 "error.no_display" = "cue: no display is available";
 "settings.title" = "Settings";
 "settings.menu_title" = "Settings…";

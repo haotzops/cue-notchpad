@@ -8,6 +8,8 @@ public final class CueTokenCounter: @unchecked Sendable {
     private let vocabulary: CueTokenVocabulary?
     private let pattern: Regex<AnyRegexOutput>?
 
+    public var isAvailable: Bool { vocabulary != nil && pattern != nil }
+
     private init() {
         vocabulary = CueTokenVocabulary.loadBundled()
         pattern = try? Regex(

@@ -7,6 +7,7 @@ public enum CueLocalizedKey: String, CaseIterable, Sendable {
     case actionDone = "action.done"
     case characterCount = "character_count.format"
     case tokenCount = "token_count.format"
+    case tokenUnavailable = "token_count.unavailable"
     case noDisplay = "error.no_display"
     case settingsTitle = "settings.title"
     case settingsMenuTitle = "settings.menu_title"
