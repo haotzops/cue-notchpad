@@ -10,6 +10,7 @@ final class CueHostServer {
     weak var delegate: CueHostServerDelegate?
     private var listenFD: Int32 = -1
     private var serverThread: Thread?
+    private var ownsSocket = false
 
     func start() throws {
         let socketURL = URL(fileURLWithPath: CueIPC.socketPath)
@@ -41,6 +42,7 @@ final class CueHostServer {
             throw error
         }
         listenFD = fd
+        ownsSocket = true
         serverThread = Thread { [weak self] in self?.acceptPendingClients() }
         serverThread?.start()
     }
@@ -51,7 +53,10 @@ final class CueHostServer {
             listenFD = -1
         }
         serverThread = nil
-        unlink(CueIPC.socketPath)
+        if ownsSocket {
+            unlink(CueIPC.socketPath)
+            ownsSocket = false
+        }
     }
 
     deinit { stop() }
