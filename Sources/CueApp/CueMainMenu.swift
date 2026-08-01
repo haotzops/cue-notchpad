@@ -19,22 +19,22 @@ final class CueMainMenu {
         let main = NSMenu()
         let appItem = NSMenuItem(title: "Cue", action: nil, keyEquivalent: "")
         let appMenu = NSMenu(title: "Cue")
-        appMenu.addItem(withTitle: localized(.menuQuitCue, "Quit Cue"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: localized(.menuQuitCue), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         main.addItem(appItem)
 
-        let editItem = NSMenuItem(title: localized(.menuEdit, "Edit"), action: nil, keyEquivalent: "")
+        let editItem = NSMenuItem(title: localized(.menuEdit), action: nil, keyEquivalent: "")
         let edit = NSMenu(title: editItem.title)
         // AppKit exposes these responder-chain actions as `undo:` / `redo:`;
         // unlike NSText's cut/copy/paste actions, they are not Swift members
         // of NSText, so retain their canonical Objective-C selectors.
-        edit.addItem(item(localized(.menuUndo, "Undo"), Selector(("undo:")), "z"))
-        edit.addItem(item(localized(.menuRedo, "Redo"), Selector(("redo:")), "z", [.command, .shift]))
+        edit.addItem(item(localized(.menuUndo), Selector(("undo:")), "z"))
+        edit.addItem(item(localized(.menuRedo), Selector(("redo:")), "z", [.command, .shift]))
         edit.addItem(.separator())
-        edit.addItem(item(localized(.menuCut, "Cut"), #selector(NSText.cut(_:)), "x"))
-        edit.addItem(item(localized(.menuCopy, "Copy"), #selector(NSText.copy(_:)), "c"))
-        edit.addItem(item(localized(.menuPaste, "Paste"), #selector(NSText.paste(_:)), "v"))
-        edit.addItem(item(localized(.menuSelectAll, "Select All"), #selector(NSText.selectAll(_:)), "a"))
+        edit.addItem(item(localized(.menuCut), #selector(NSText.cut(_:)), "x"))
+        edit.addItem(item(localized(.menuCopy), #selector(NSText.copy(_:)), "c"))
+        edit.addItem(item(localized(.menuPaste), #selector(NSText.paste(_:)), "v"))
+        edit.addItem(item(localized(.menuSelectAll), #selector(NSText.selectAll(_:)), "a"))
         editItem.submenu = edit
         main.addItem(editItem)
         NSApp.mainMenu = main
@@ -47,7 +47,7 @@ final class CueMainMenu {
         return item
     }
 
-    private func localized(_ key: CueLocalizedKey, _ fallback: String) -> String {
-        CueLocalization.string(key, fallback: fallback, localization: settings.localizationIdentifier)
+    private func localized(_ key: CueLocalizedKey) -> String {
+        CueLocalization.string(key, localization: settings.localizationIdentifier)
     }
 }

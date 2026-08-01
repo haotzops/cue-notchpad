@@ -18,6 +18,7 @@
 "settings.editor_font" = "编辑器字体";
 "settings.choose_font" = "选择…";
 "settings.restore_default_font" = "恢复默认编辑器字体";
+"settings.restore_default_window_size" = "恢复默认窗口大小";
 "settings.chinese_english_spacing" = "提交时自动在中英文之间加空格";
 "settings.chinese_english_spacing.hint" = "在提交 prompt 时应用。";
 "settings.inline_completion" = "启用 DeepSeek 行间补全";
@@ -117,4 +118,4 @@
 "unit.points" = "pt";
 "language.english" = "英文";
 "language.simplified_chinese" = "简体中文";
-"fim_usage.format" = "FIM：0/0";
+"fim_usage.format" = "FIM：%lld/%lld";

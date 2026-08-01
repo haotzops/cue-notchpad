@@ -1,6 +1,6 @@
 import Foundation
 
-public enum CueLocalizedKey: String, Sendable {
+public enum CueLocalizedKey: String, CaseIterable, Sendable {
     case promptLabel = "prompt.label"
     case promptPlaceholder = "prompt.placeholder"
     case actionCancel = "action.cancel"
@@ -28,6 +28,7 @@ public enum CueLocalizedKey: String, Sendable {
     case fimUsage = "fim_usage.format"
     case settingsChooseFont = "settings.choose_font"
     case settingsRestoreDefaultFont = "settings.restore_default_font"
+    case settingsRestoreDefaultWindowSize = "settings.restore_default_window_size"
     case settingsChineseEnglishSpacing = "settings.chinese_english_spacing"
     case settingsChineseEnglishSpacingHint = "settings.chinese_english_spacing.hint"
     case settingsInlineCompletion = "settings.inline_completion"
@@ -105,26 +106,25 @@ public enum CueLocalizedKey: String, Sendable {
 /// files in a sibling resource bundle, which is discovered without relying on
 /// an absolute build path.
 public enum CueLocalization {
+    /// Looks up a key from the app's `Localizable.strings` table.
+    ///
+    /// English is the package's development localization, so translated copy
+    /// has one source of truth: the `.strings` resources. The optional
+    /// identifier is used by the in-app language preference rather than the
+    /// process-wide system language.
     public static func string(
         _ key: CueLocalizedKey,
-        fallback: String,
         localization: String? = nil
     ) -> String {
-        let identifier = resolvedLocalization(localization)
-        return localizationTables[identifier]?[key.rawValue]
-            ?? localizationTables["en"]?[key.rawValue]
-            ?? fallback
+        let bundle = bundle(for: localization)
+        return bundle.localizedString(forKey: key.rawValue, value: key.rawValue, table: "Localizable")
     }
 
     public static func characterCount(
         _ count: Int,
         localization: String? = nil
     ) -> String {
-        let format = string(
-            .characterCount,
-            fallback: "ch: %lld",
-            localization: localization
-        )
+        let format = string(.characterCount, localization: localization)
         return String(format: format, locale: Locale.current, Int64(count))
     }
 
@@ -132,47 +132,22 @@ public enum CueLocalization {
         _ count: Int,
         localization: String? = nil
     ) -> String {
-        let format = string(
-            .tokenCount,
-            fallback: "token: %lld",
-            localization: localization
-        )
+        let format = string(.tokenCount, localization: localization)
         return String(format: format, locale: Locale.current, Int64(count))
     }
 
-    private static func resolvedLocalization(_ requested: String?) -> String {
-        let available = Array(localizationTables.keys)
-        let preferences = requested.map { [$0] } ?? Locale.preferredLanguages
-
-        return Bundle.preferredLocalizations(
+    private static func bundle(for requestedLocalization: String?) -> Bundle {
+        let available = CueResources.bundle.localizations.filter { $0 != "Base" }
+        let preferences = requestedLocalization.map { [$0] } ?? Locale.preferredLanguages
+        let identifier = Bundle.preferredLocalizations(
             from: available,
             forPreferences: preferences
         ).first ?? "en"
+
+        guard let path = CueResources.bundle.path(forResource: identifier, ofType: "lproj"),
+              let localizedBundle = Bundle(path: path)
+        else { return CueResources.bundle }
+        return localizedBundle
     }
-
-    private static let localizationTables: [String: [String: String]] = {
-        var tables: [String: [String: String]] = [:]
-
-        for localization in CueResources.bundle.localizations where localization != "Base" {
-            guard let url = CueResources.bundle.url(
-                forResource: "Localizable",
-                withExtension: "strings",
-                subdirectory: nil,
-                localization: localization
-            ),
-            let data = try? Data(contentsOf: url),
-            let propertyList = try? PropertyListSerialization.propertyList(
-                from: data,
-                options: [],
-                format: nil
-            ),
-            let table = propertyList as? [String: String]
-            else { continue }
-
-            tables[localization] = table
-        }
-
-        return tables
-    }()
 
 }

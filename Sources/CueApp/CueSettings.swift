@@ -33,6 +33,16 @@ enum CueOverflowBehavior: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+struct InlineCompletionStatus: Equatable {
+    enum Style: Equatable {
+        case information
+        case error
+    }
+
+    let message: String
+    let style: Style
+}
+
 final class CueSettings: ObservableObject {
     static let defaults = UserDefaults.standard
     static let defaultWindowWidth = 550.0
@@ -127,8 +137,9 @@ final class CueSettings: ObservableObject {
     }
     @Published private(set) var inlineCompletionModels = [String]()
     @Published private(set) var isLoadingInlineCompletionModels = false
+    @Published private(set) var isTestingInlineCompletionConnection = false
     @Published var inlineCompletionKeyConfigured = false
-    @Published var inlineCompletionStatus: String?
+    @Published private(set) var inlineCompletionStatus: InlineCompletionStatus?
 
     @Published var toggleShortcut: CueShortcut {
         didSet { save(toggleShortcut, key: Keys.toggleShortcut) }
@@ -209,10 +220,12 @@ final class CueSettings: ObservableObject {
         inlineCompletionMaximumLines = min(max(Self.defaults.integer(forKey: Keys.inlineCompletionMaximumLines), 1), 100)
         promptExpansionModel = Self.defaults.string(forKey: Keys.promptExpansionModel)
         let legacyDefaultPolishPrompt = "在不改变原意的前提下，润色并扩写以下 prompt；只输出最终 prompt，不要解释。"
+        let selectedLocalization = CueLanguage(
+            rawValue: Self.defaults.string(forKey: Keys.language) ?? CueLanguage.system.rawValue
+        )?.localizationIdentifier
         let localizedDefaultPolishPrompt = CueLocalization.string(
             .settingsAIPolishDefaultPrompt,
-            fallback: "Polish and expand the following prompt without changing its meaning. Output only the final prompt, with no explanation.",
-            localization: Self.defaults.string(forKey: Keys.language)
+            localization: selectedLocalization
         )
         let storedPolishPrompt = Self.defaults.string(forKey: Keys.promptExpansionInstruction)
         promptExpansionInstruction = (storedPolishPrompt == nil || storedPolishPrompt == legacyDefaultPolishPrompt)
@@ -235,41 +248,39 @@ final class CueSettings: ObservableObject {
     func saveDeepSeekAPIKey(_ key: String) {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            inlineCompletionStatus = localized(.settingsAPIKeyMissing, fallback: "Enter an API key before saving.")
+            setInlineCompletionStatus(.settingsAPIKeyMissing, style: .error)
             return
         }
         do {
             try CueAPIKeyStore.saveDeepSeekAPIKey(trimmed)
             inlineCompletionKeyConfigured = true
-            inlineCompletionStatus = localized(.settingsAPIKeySaved, fallback: "API key saved in local configuration.")
+            setInlineCompletionStatus(.settingsAPIKeySaved)
             refreshDeepSeekModelsIfPossible()
         } catch {
-            inlineCompletionStatus = error.localizedDescription
+            setInlineCompletionStatus(error.localizedDescription, style: .error)
         }
     }
 
     func testDeepSeekAPIKey() {
         guard let apiKey = try? CueAPIKeyStore.loadDeepSeekAPIKey() else {
-            inlineCompletionStatus = localized(.settingsAPIKeyMissing, fallback: "Enter an API key before saving.")
+            setInlineCompletionStatus(.settingsAPIKeyMissing, style: .error)
             return
         }
         guard let model = inlineCompletionModel else {
-            inlineCompletionStatus = localized(.settingsModelMissing, fallback: "Choose a model first.")
+            setInlineCompletionStatus(.settingsModelMissing, style: .error)
             return
         }
-        inlineCompletionStatus = localized(.settingsTestingAPIKey, fallback: "Testing API key…")
+        guard !isTestingInlineCompletionConnection else { return }
+
+        isTestingInlineCompletionConnection = true
+        setInlineCompletionStatus(.settingsTestingAPIKey)
         Task { @MainActor [weak self] in
+            defer { self?.isTestingInlineCompletionConnection = false }
             do {
                 try await DeepSeekFIMCompletionProvider().validate(apiKey: apiKey, model: model)
-                self?.inlineCompletionStatus = self?.localized(
-                    .settingsAPIKeyValid,
-                    fallback: "DeepSeek API key is valid."
-                )
+                self?.setInlineCompletionStatus(.settingsAPIKeyValid)
             } catch {
-                self?.inlineCompletionStatus = self?.localized(
-                    .settingsInlineCompletionUnavailable,
-                    fallback: "Inline completion is temporarily unavailable."
-                )
+                self?.setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
             }
         }
     }
@@ -277,16 +288,13 @@ final class CueSettings: ObservableObject {
     func refreshDeepSeekModelsIfPossible() {
         guard let apiKey = try? CueAPIKeyStore.loadDeepSeekAPIKey(), !isLoadingInlineCompletionModels else { return }
         isLoadingInlineCompletionModels = true
-        inlineCompletionStatus = localized(.settingsLoadingModels, fallback: "Loading available models…")
+        setInlineCompletionStatus(.settingsLoadingModels)
         Task { @MainActor [weak self] in
             defer { self?.isLoadingInlineCompletionModels = false }
             do {
                 let models = try await DeepSeekFIMCompletionProvider().availableModels(apiKey: apiKey)
                 guard !models.isEmpty else {
-                    self?.inlineCompletionStatus = self?.localized(
-                        .settingsInlineCompletionUnavailable,
-                        fallback: "Inline completion is temporarily unavailable."
-                    )
+                    self?.setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
                     return
                 }
                 self?.inlineCompletionModels = models
@@ -295,10 +303,7 @@ final class CueSettings: ObservableObject {
                 }
                 self?.inlineCompletionStatus = nil
             } catch {
-                self?.inlineCompletionStatus = self?.localized(
-                    .settingsInlineCompletionUnavailable,
-                    fallback: "Inline completion is temporarily unavailable."
-                )
+                self?.setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
             }
         }
     }
@@ -310,14 +315,32 @@ final class CueSettings: ObservableObject {
             inlineCompletionEnabled = false
             inlineCompletionModel = nil
             inlineCompletionModels = []
-            inlineCompletionStatus = localized(.settingsAPIKeyRemoved, fallback: "API key removed.")
+            setInlineCompletionStatus(.settingsAPIKeyRemoved)
         } catch {
-            inlineCompletionStatus = error.localizedDescription
+            setInlineCompletionStatus(error.localizedDescription, style: .error)
         }
     }
 
-    func localized(_ key: CueLocalizedKey, fallback: String) -> String {
-        CueLocalization.string(key, fallback: fallback, localization: language.localizationIdentifier)
+    func localized(_ key: CueLocalizedKey) -> String {
+        CueLocalization.string(key, localization: language.localizationIdentifier)
+    }
+
+    func reportInlineCompletionFailure(_ key: CueLocalizedKey) {
+        setInlineCompletionStatus(key, style: .error)
+    }
+
+    private func setInlineCompletionStatus(
+        _ key: CueLocalizedKey,
+        style: InlineCompletionStatus.Style = .information
+    ) {
+        setInlineCompletionStatus(localized(key), style: style)
+    }
+
+    private func setInlineCompletionStatus(
+        _ message: String,
+        style: InlineCompletionStatus.Style = .information
+    ) {
+        inlineCompletionStatus = InlineCompletionStatus(message: message, style: style)
     }
 
     private func save(_ shortcut: CueShortcut, key: String) {

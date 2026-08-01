@@ -18,6 +18,7 @@
 "settings.editor_font" = "Editor Font";
 "settings.choose_font" = "Choose…";
 "settings.restore_default_font" = "Restore default editor font";
+"settings.restore_default_window_size" = "Restore default window size";
 "settings.chinese_english_spacing" = "Add spaces between Chinese and English when submitting";
 "settings.chinese_english_spacing.hint" = "Apply spacing when the prompt is submitted.";
 "settings.inline_completion" = "Enable DeepSeek inline completion";
@@ -117,4 +118,4 @@
 "unit.points" = "pt";
 "language.english" = "English";
 "language.simplified_chinese" = "Simplified Chinese";
-"fim_usage.format" = "FIM: 0/0";
+"fim_usage.format" = "FIM: %lld/%lld";

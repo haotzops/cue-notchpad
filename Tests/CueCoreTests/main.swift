@@ -79,17 +79,17 @@ let minimumHeightLayout = NotchLayout(
 expect(minimumHeightLayout.openSize.height == 130, "minimum height")
 
 expect(
-    CueLocalization.string(.promptPlaceholder, fallback: "missing", localization: "en")
+    CueLocalization.string(.promptPlaceholder,  localization: "en")
         == "Write a prompt…",
     "English prompt localization"
 )
 expect(
-    CueLocalization.string(.actionDone, fallback: "missing", localization: "zh-Hans")
+    CueLocalization.string(.actionDone,  localization: "zh-Hans")
         == "完成",
     "Simplified Chinese action localization"
 )
 expect(
-    CueLocalization.string(.promptLabel, fallback: "missing", localization: "zh-Hans")
+    CueLocalization.string(.promptLabel,  localization: "zh-Hans")
         == "PROMPT",
     "Simplified Chinese prompt label"
 )
@@ -105,6 +105,32 @@ expect(
     CueLocalization.tokenCount(7, localization: "en") == "token: 7"
         && CueLocalization.tokenCount(7, localization: "zh-Hans") == "token: 7",
     "language-independent token label"
+)
+for localization in ["en", "zh-Hans"] {
+    for key in CueLocalizedKey.allCases {
+        expect(
+            CueLocalization.string(key, localization: localization) != key.rawValue,
+            "\(localization) is missing \(key.rawValue)"
+        )
+    }
+}
+expect(
+    String(
+        format: CueLocalization.string(.fimUsage,  localization: "en"),
+        locale: Locale(identifier: "en_US_POSIX"),
+        Int64(12),
+        Int64(34)
+    ) == "FIM: 12/34",
+    "English FIM usage format"
+)
+expect(
+    String(
+        format: CueLocalization.string(.fimUsage,  localization: "zh-Hans"),
+        locale: Locale(identifier: "zh_Hans_CN"),
+        Int64(12),
+        Int64(34)
+    ) == "FIM：12/34",
+    "Simplified Chinese FIM usage format"
 )
 
 let spacingVectors: [(String, String)] = [

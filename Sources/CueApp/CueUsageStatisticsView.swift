@@ -26,28 +26,28 @@ struct CueUsageStatisticsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Picker("", selection: $period) {
-                Text(localized(.usageToday, "Today")).tag(CueUsagePeriod.day)
-                Text(localized(.usageWeek, "Last 7 days")).tag(CueUsagePeriod.week)
-                Text(localized(.usageMonth, "Last 30 days")).tag(CueUsagePeriod.month)
-                Text(localized(.usageCustom, "Custom")).tag(CueUsagePeriod.custom)
+                Text(localized(.usageToday)).tag(CueUsagePeriod.day)
+                Text(localized(.usageWeek)).tag(CueUsagePeriod.week)
+                Text(localized(.usageMonth)).tag(CueUsagePeriod.month)
+                Text(localized(.usageCustom)).tag(CueUsagePeriod.custom)
             }
             .labelsHidden()
             .pickerStyle(.segmented)
             .frame(maxWidth: .infinity)
             if period == .custom {
-                DatePicker(localized(.usageStart, "Start"), selection: $customStart, displayedComponents: .date)
-                DatePicker(localized(.usageEnd, "End"), selection: $customEnd, displayedComponents: .date)
+                DatePicker(localized(.usageStart), selection: $customStart, displayedComponents: .date)
+                DatePicker(localized(.usageEnd), selection: $customEnd, displayedComponents: .date)
             }
             let totals = usage.totals(from: range.0, through: range.1)
-            LabeledContent(localized(.usageFIMInput, "FIM input tokens"), value: "\(totals.input)")
-            LabeledContent(localized(.usageFIMOutput, "FIM output tokens"), value: "\(totals.output)")
-            LabeledContent(localized(.usageFIMTokens, "FIM tokens"), value: "\(totals.total)")
-            LabeledContent(localized(.usageFIMRequests, "FIM API requests"), value: "\(totals.requests)")
-            LabeledContent(localized(.usageCueOpens, "Cue opens"), value: "\(totals.opens)")
+            LabeledContent(localized(.usageFIMInput), value: "\(totals.input)")
+            LabeledContent(localized(.usageFIMOutput), value: "\(totals.output)")
+            LabeledContent(localized(.usageFIMTokens), value: "\(totals.total)")
+            LabeledContent(localized(.usageFIMRequests), value: "\(totals.requests)")
+            LabeledContent(localized(.usageCueOpens), value: "\(totals.opens)")
         }
     }
 
-    private func localized(_ key: CueLocalizedKey, _ fallback: String) -> String {
-        CueLocalization.string(key, fallback: fallback, localization: settings.localizationIdentifier)
+    private func localized(_ key: CueLocalizedKey) -> String {
+        CueLocalization.string(key, localization: settings.localizationIdentifier)
     }
 }

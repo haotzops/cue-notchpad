@@ -234,7 +234,7 @@ struct PromptView: View {
 
                 Spacer()
 
-                Text(localized(.promptLabel, "PROMPT"))
+                Text(localized(.promptLabel))
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(1.2)
                     .foregroundStyle(.white.opacity(0.30))
@@ -269,7 +269,7 @@ struct PromptView: View {
                         .foregroundStyle(.white.opacity(0.18))
 
                     Text(String(
-                        format: CueLocalization.string(.fimUsage, fallback: "FIM: %lld/%lld", localization: settings.localizationIdentifier),
+                        format: CueLocalization.string(.fimUsage,  localization: settings.localizationIdentifier),
                         Int64(presentation.model.fimInputTokens),
                         Int64(presentation.model.fimOutputTokens)
                     ))
@@ -291,7 +291,7 @@ struct PromptView: View {
 
                 if presentation.sessionCount > 1 {
                     shortcutKeycaps(settings.nextShortcut)
-                    Text(localized(.shortcutNext, "Next session"))
+                    Text(localized(.shortcutNext))
                         .foregroundStyle(.white.opacity(0.42))
                     Text("·")
                         .foregroundStyle(.white.opacity(0.18))
@@ -301,7 +301,7 @@ struct PromptView: View {
                 keycap("⌘")
                 keycap("↩")
                     .padding(.leading, -4)
-                Text(localized(.actionDone, "done"))
+                Text(localized(.actionDone))
                     .foregroundStyle(.white.opacity(0.56))
             }
             .font(.system(size: 10, weight: .medium))
@@ -328,15 +328,15 @@ struct PromptView: View {
         CueLocalization.tokenCount(presentation.model.tokenCount, localization: localization)
     }
 
-    private func localized(_ key: CueLocalizedKey, _ fallback: String) -> String {
-        CueLocalization.string(key, fallback: fallback, localization: localization)
+    private func localized(_ key: CueLocalizedKey) -> String {
+        CueLocalization.string(key, localization: localization)
     }
 
     private var sessionEditor: some View {
         SessionEditor(
             model: presentation.model,
             settings: settings,
-            placeholder: localized(.promptPlaceholder, "Write a prompt…"),
+            placeholder: localized(.promptPlaceholder),
             onSubmit: onSubmit,
             onCancel: onCancel,
             onHide: onHide,

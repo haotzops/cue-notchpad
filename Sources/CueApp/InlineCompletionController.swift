@@ -166,25 +166,13 @@ final class InlineCompletionController {
         if let apiError = error as? DeepSeekFIMError {
             switch apiError {
             case .httpStatus(401):
-                settings?.inlineCompletionStatus = settings?.localized(
-                    .settingsAPIKeyRejected,
-                    fallback: "DeepSeek API key was rejected."
-                )
+                settings?.reportInlineCompletionFailure(.settingsAPIKeyRejected)
             case .httpStatus(402):
-                settings?.inlineCompletionStatus = settings?.localized(
-                    .settingsInlineCompletionUnavailable,
-                    fallback: "DeepSeek account balance is insufficient."
-                )
+                settings?.reportInlineCompletionFailure(.settingsInlineCompletionUnavailable)
             case .httpStatus(429):
-                settings?.inlineCompletionStatus = settings?.localized(
-                    .settingsInlineCompletionRateLimited,
-                    fallback: "DeepSeek is rate limiting completion requests."
-                )
+                settings?.reportInlineCompletionFailure(.settingsInlineCompletionRateLimited)
             default:
-                settings?.inlineCompletionStatus = settings?.localized(
-                    .settingsInlineCompletionUnavailable,
-                    fallback: "Inline completion is temporarily unavailable."
-                )
+                settings?.reportInlineCompletionFailure(.settingsInlineCompletionUnavailable)
             }
         }
     }
