@@ -238,9 +238,9 @@ struct PromptView: View {
                 Spacer()
 
                 Text(localized(.promptLabel))
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .tracking(1.2)
-                    .foregroundStyle(.white.opacity(0.30))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .tracking(1.4)
+                    .foregroundStyle(.white.opacity(0.45))
             }
             .frame(height: layout.contentTopInset)
             .padding(.horizontal, chromeHorizontalInset)

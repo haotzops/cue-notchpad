@@ -105,13 +105,13 @@
 
 "usage.cue_opens" = "Cue opens";
 
-"settings.polish_prompt" = "Polishing prompt";
-"settings.polish_prompt.hint" = "Changes save automatically and apply to the next polish request.";
+"settings.rewrite_prompt" = "Rewrite prompt";
+"settings.rewrite_prompt.hint" = "Changes save automatically and apply to the next rewrite request. The prompt can ask AI to translate, rewrite, expand, or add detail.";
 
 "settings.model_api_configuration" = "Model API Configuration";
-"settings.ai_polish" = "AI Polish";
+"settings.ai_rewrite" = "AI Rewrite";
 "settings.usage_period" = "Statistics period";
-"settings.ai_polish.default_prompt" = "Polish and expand the following prompt without changing its meaning. Output only the final prompt, with no explanation.";
+"settings.ai_rewrite.default_prompt" = "Rewrite and expand the following prompt without changing its meaning. Output only the final prompt, with no explanation.";
 
 "settings.system_font_regular" = "System Font Regular";
 

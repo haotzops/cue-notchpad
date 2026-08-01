@@ -22,7 +22,7 @@ struct CueShortcutSettingsView: View {
                 )
                 .frame(width: 110, height: 24)
             }
-            shortcutRow(settings.localized(.settingsAIPolish), shortcut: $settings.promptExpansionShortcut)
+            shortcutRow(settings.localized(.settingsAIRewrite), shortcut: $settings.promptExpansionShortcut)
         }
     }
 

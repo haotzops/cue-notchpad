@@ -19,13 +19,13 @@ struct CueBrandMark: View {
                     .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 12, height: 12)
+                    .frame(width: 16, height: 16)
                     .foregroundStyle(.white)
             }
 
             Text("cue")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .tracking(1.2)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .tracking(1.4)
                 .foregroundStyle(.white)
         }
     }

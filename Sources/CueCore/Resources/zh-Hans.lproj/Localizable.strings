@@ -105,13 +105,13 @@
 
 "usage.cue_opens" = "Cue 打开次数";
 
-"settings.polish_prompt" = "润色提示词";
-"settings.polish_prompt.hint" = "修改会自动保存，并在下次润色时应用。";
+"settings.rewrite_prompt" = "重写提示词";
+"settings.rewrite_prompt.hint" = "修改会自动保存，并在下次重写时应用。提示词中可以让 AI 翻译、重写、扩写或补充细节。";
 
 "settings.model_api_configuration" = "模型 API 配置";
-"settings.ai_polish" = "AI 润色";
+"settings.ai_rewrite" = "AI 重写";
 "settings.usage_period" = "统计周期";
-"settings.ai_polish.default_prompt" = "在不改变原意的前提下，润色并扩写以下 prompt；只输出最终 prompt，不要解释。";
+"settings.ai_rewrite.default_prompt" = "在不改变原意的前提下，重写并扩写以下 prompt；只输出最终 prompt，不要解释。";
 
 "settings.system_font_regular" = "系统字体常规体";
 

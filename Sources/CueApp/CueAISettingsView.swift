@@ -8,7 +8,7 @@ struct CueAISettingsView: View {
     var body: some View {
         modelAPIConfiguration
         inlineCompletion
-        promptPolish
+        promptRewrite
     }
 
     private var modelAPIConfiguration: some View {
@@ -118,8 +118,8 @@ struct CueAISettingsView: View {
         }
     }
 
-    private var promptPolish: some View {
-        Section(settings.localized(.settingsAIPolish)) {
+    private var promptRewrite: some View {
+        Section(settings.localized(.settingsAIRewrite)) {
             Picker(settings.localized(.settingsInlineCompletionModel), selection: $settings.promptExpansionModel) {
                 Text(settings.localized(.settingsChooseModel)).tag(String?.none)
                 ForEach(settings.inlineCompletionModels, id: \.self) {
@@ -129,11 +129,11 @@ struct CueAISettingsView: View {
             .disabled(!settings.inlineCompletionKeyConfigured)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(settings.localized(.settingsPolishPrompt))
+                Text(settings.localized(.settingsRewritePrompt))
                 TextEditor(text: $settings.promptExpansionInstruction)
                     .font(.body)
                     .frame(minHeight: 72)
-                Text(settings.localized(.settingsPolishPromptHint))
+                Text(settings.localized(.settingsRewritePromptHint))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

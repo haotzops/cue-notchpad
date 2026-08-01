@@ -205,7 +205,7 @@ final class CueSettings: ObservableObject {
             Keys.inlineCompletionTriggerMode: InlineCompletionTriggerMode.manual.rawValue,
             Keys.inlineCompletionDelayMilliseconds: 200.0,
             Keys.inlineCompletionMaximumLines: 1,
-            Keys.promptExpansionInstruction: "在不改变原意的前提下，润色并扩写以下 prompt；只输出最终 prompt，不要解释。",
+            Keys.promptExpansionInstruction: "在不改变原意的前提下，重写并扩写以下 prompt；只输出最终 prompt，不要解释。",
         ])
 
         language = CueLanguage(
@@ -227,18 +227,17 @@ final class CueSettings: ObservableObject {
         inlineCompletionDelayMilliseconds = min(max(Self.defaults.double(forKey: Keys.inlineCompletionDelayMilliseconds), 0), 5_000)
         inlineCompletionMaximumLines = min(max(Self.defaults.integer(forKey: Keys.inlineCompletionMaximumLines), 1), 100)
         promptExpansionModel = Self.defaults.string(forKey: Keys.promptExpansionModel)
-        let legacyDefaultPolishPrompt = "在不改变原意的前提下，润色并扩写以下 prompt；只输出最终 prompt，不要解释。"
         let selectedLocalization = CueLanguage(
             rawValue: Self.defaults.string(forKey: Keys.language) ?? CueLanguage.system.rawValue
         )?.localizationIdentifier
-        let localizedDefaultPolishPrompt = CueLocalization.string(
-            .settingsAIPolishDefaultPrompt,
+        let localizedDefaultRewritePrompt = CueLocalization.string(
+            .settingsAIRewriteDefaultPrompt,
             localization: selectedLocalization
         )
-        let storedPolishPrompt = Self.defaults.string(forKey: Keys.promptExpansionInstruction)
-        promptExpansionInstruction = (storedPolishPrompt == nil || storedPolishPrompt == legacyDefaultPolishPrompt)
-            ? localizedDefaultPolishPrompt
-            : storedPolishPrompt!
+        // A stored instruction is user data, including a prior default that a
+        // user may have edited; never replace it during an application update.
+        promptExpansionInstruction = Self.defaults.string(forKey: Keys.promptExpansionInstruction)
+            ?? localizedDefaultRewritePrompt
         inlineCompletionModel = Self.defaults.string(forKey: Keys.inlineCompletionModel)
         inlineCompletionKeyConfigured = (try? CueAPIKeyStore.loadDeepSeekAPIKey()) != nil
         toggleShortcut = Self.loadShortcut(key: Keys.toggleShortcut, fallback: .toggleDefault)
