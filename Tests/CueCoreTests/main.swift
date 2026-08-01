@@ -28,6 +28,31 @@ do {
     expect(dashFile.filePath == "-prompt.md", "-- should accept dash path")
 } catch { expect(false, "file argument should parse: \(error)") }
 
+expect(CueIPC.supports(version: CueIPC.protocolVersion), "current IPC version is supported")
+expect(!CueIPC.supports(version: CueIPC.protocolVersion + 1), "future IPC version is rejected")
+
+let temporaryDirectory = FileManager.default.temporaryDirectory
+    .appendingPathComponent("cue-core-tests-\(UUID().uuidString)")
+let temporaryFile = temporaryDirectory.appendingPathComponent("prompt.txt")
+do {
+    try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+    try Data("before".utf8).write(to: temporaryFile)
+    let snapshot = try CueFileWriter.snapshot(at: temporaryFile)
+    try CueFileWriter.replace(with: "after", matching: snapshot)
+    let writtenText = try String(contentsOf: temporaryFile, encoding: .utf8)
+    expect(writtenText == "after", "file writer replaces unchanged file")
+    try Data("external".utf8).write(to: temporaryFile)
+    do {
+        try CueFileWriter.replace(with: "lost", matching: snapshot)
+        expect(false, "file writer must reject an externally changed file")
+    } catch CueFileWriteError.changedByAnotherProcess {
+        // Expected.
+    }
+} catch {
+    expect(false, "file writer should preserve unchanged files: \(error)")
+}
+try? FileManager.default.removeItem(at: temporaryDirectory)
+
 for arguments in [[], ["-w"], ["--wait", "a", "b"], ["--help"], ["-file.txt"]] {
     do {
         _ = try CueArguments(arguments: arguments)

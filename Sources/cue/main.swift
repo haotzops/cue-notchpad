@@ -52,10 +52,22 @@ let args: CueArguments
 do { args = try CueArguments(arguments: Array(CommandLine.arguments.dropFirst())) }
 catch { stderr("usage: cue [--wait] [file]"); exit(EX_USAGE) }
 let input: String
+let fileSnapshot: CueFileSnapshot?
 do {
-    if let path = args.filePath { input = try String(contentsOfFile: path, encoding: .utf8) }
-    else if isatty(STDIN_FILENO) == 0 { input = String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self) }
-    else { input = "" }
+    if let path = args.filePath {
+        let snapshot = try CueFileWriter.snapshot(at: URL(fileURLWithPath: path))
+        guard let text = String(data: snapshot.contents, encoding: .utf8) else {
+            throw CocoaError(.fileReadInapplicableStringEncoding)
+        }
+        input = text
+        fileSnapshot = snapshot
+    } else if isatty(STDIN_FILENO) == 0 {
+        input = String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
+        fileSnapshot = nil
+    } else {
+        input = ""
+        fileSnapshot = nil
+    }
 } catch { stderr("cue: cannot read file: \(error)"); exit(EXIT_FAILURE) }
 let document: CueDocument = args.filePath.map { .file(path: $0) } ?? .standardInput
 let request = CueSessionRequest(initialText: input, document: document, callerPID: getppid(), callerName: callerName(), workingDirectory: FileManager.default.currentDirectoryPath)
@@ -71,8 +83,15 @@ let responseData = readAll(fd); close(fd)
 guard let response = try? JSONDecoder().decode(CueSessionResponse.self, from: responseData) else { stderr("cue: edit session ended unexpectedly"); exit(EXIT_FAILURE) }
 switch response {
 case .submitted(let text):
-    if case .file(let path) = document { do { try text.write(toFile: path, atomically: true, encoding: .utf8) } catch { stderr("cue: cannot write \(path): \(error)"); exit(EXIT_FAILURE) } }
-    else { FileHandle.standardOutput.write(Data(text.utf8)) }
+    if case .file(let path) = document {
+        do {
+            guard let fileSnapshot else { throw CocoaError(.fileNoSuchFile) }
+            try CueFileWriter.replace(with: text, matching: fileSnapshot)
+        } catch {
+            stderr("cue: cannot write \(path): \(error)")
+            exit(EXIT_FAILURE)
+        }
+    } else { FileHandle.standardOutput.write(Data(text.utf8)) }
     exit(EXIT_SUCCESS)
 case .cancelled: exit(130)
 case .failed(let message): stderr("cue: \(message)"); exit(EXIT_FAILURE)

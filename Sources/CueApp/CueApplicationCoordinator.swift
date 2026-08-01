@@ -16,7 +16,7 @@ public final class CueApplicationCoordinator: NSObject, CueHostServerDelegate, N
     private var controller: PromptWindowController?
     private var sessions: [Session] = []
     private var active = 0
-    private var cueIsVisible = false
+    private let maximumPendingSessions = 16
 
     public func run() {
         let application = NSApplication.shared
@@ -39,6 +39,10 @@ public final class CueApplicationCoordinator: NSObject, CueHostServerDelegate, N
     }
 
     func hostServer(_ server: CueHostServer, received request: CueSessionRequest, fileDescriptor: Int32) {
+        guard sessions.count < maximumPendingSessions else {
+            CueHostServer.reply(.failed("Cue has too many pending edit sessions."), to: fileDescriptor)
+            return
+        }
         // The full IPC request may contain up to 8 MiB of initial text. Once
         // PromptModel owns the live document, retain only presentation metadata
         // instead of keeping the decoded request for the entire wait session.
@@ -50,7 +54,6 @@ public final class CueApplicationCoordinator: NSObject, CueHostServerDelegate, N
         ))
         if sessions.count == 1 { active = 0 }
         else { active = sessions.count - 1 }
-        cueIsVisible = true
         presentActive(direction: sessions.count > 1 ? 1 : 0)
     }
 
@@ -70,10 +73,8 @@ public final class CueApplicationCoordinator: NSObject, CueHostServerDelegate, N
     private func toggleCue() {
         guard !sessions.isEmpty else { return }
         if controller?.window?.isVisible == true {
-            cueIsVisible = false
             controller?.hideTemporarily()
         } else {
-            cueIsVisible = true
             // Reconfigure after an Escape cancellation so the restored panel
             // never displays the session that was just discarded.
             presentActive(direction: 0)
@@ -91,7 +92,6 @@ public final class CueApplicationCoordinator: NSObject, CueHostServerDelegate, N
         let session = sessions.remove(at: active)
         switch outcome { case .submitted(let text): CueHostServer.reply(.submitted(text), to: session.fd); case .cancelled: CueHostServer.reply(.cancelled, to: session.fd) }
         if sessions.isEmpty {
-            cueIsVisible = false
             controller?.close()
             controller = nil
             server.stop()
@@ -105,10 +105,8 @@ public final class CueApplicationCoordinator: NSObject, CueHostServerDelegate, N
         // Escape cancels only the current transaction and hides Cue. Remaining
         // callers keep waiting until the user explicitly restores Cue.
         if case .cancelled = outcome {
-            cueIsVisible = false
             return
         }
-        cueIsVisible = true
         presentActive(direction: 0)
     }
 }
