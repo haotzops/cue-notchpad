@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SOURCE="${1:-$ROOT/logo.svg}"
+SOURCE="${1:-$ROOT/Supporting/logo.svg}"
 OUTPUT="${2:-$ROOT/build/cue-logo.icns}"
 
 [[ -f "$SOURCE" ]] || { printf 'Icon source does not exist: %s\n' "$SOURCE" >&2; exit 2; }

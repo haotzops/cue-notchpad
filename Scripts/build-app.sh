@@ -69,7 +69,7 @@ fi
 cp "$INFO_PLIST" "$APP/Contents/Info.plist"
 "$PLIST_BUDDY" -c "Set :CFBundleShortVersionString $RELEASE_VERSION" "$APP/Contents/Info.plist"
 "$PLIST_BUDDY" -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
-"$ROOT/Scripts/generate-app-icon.sh" "$ROOT/logo.svg" "$APP/Contents/Resources/cue-logo.icns"
+"$ROOT/Scripts/generate-app-icon.sh" "$ROOT/Supporting/logo.svg" "$APP/Contents/Resources/cue-logo.icns"
 cp "$ROOT/Supporting/ThirdPartyNotices.txt" "$APP/Contents/Resources/"
 [[ ! -f "$ROOT/LICENSE" ]] || cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
 
