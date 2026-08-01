@@ -19,6 +19,13 @@ public enum CueLocalizedKey: String, Sendable {
     case settingsSizeHint = "settings.size_hint"
     case settingsEditor = "settings.editor"
     case settingsEditorFont = "settings.editor_font"
+    case settingsSystemFontRegular = "settings.system_font_regular"
+    case settingsFIM = "settings.fim"
+    case unitMilliseconds = "unit.milliseconds"
+    case unitPoints = "unit.points"
+    case languageEnglish = "language.english"
+    case languageSimplifiedChinese = "language.simplified_chinese"
+    case fimUsage = "fim_usage.format"
     case settingsChooseFont = "settings.choose_font"
     case settingsRestoreDefaultFont = "settings.restore_default_font"
     case settingsChineseEnglishSpacing = "settings.chinese_english_spacing"
@@ -48,6 +55,33 @@ public enum CueLocalizedKey: String, Sendable {
     case settingsOverflowScrollable = "settings.overflow.scrollable"
     case settingsOverflowGrow = "settings.overflow.grow"
     case settingsShortcuts = "settings.shortcuts"
+    case settingsPageGeneral = "settings.page.general"
+    case settingsPageAI = "settings.page.ai"
+    case settingsPageUsage = "settings.page.usage"
+    case settingsTriggerMode = "settings.trigger_mode"
+    case settingsTriggerAutomatic = "settings.trigger.automatic"
+    case settingsTriggerManual = "settings.trigger.manual"
+    case settingsTriggerDelay = "settings.trigger_delay"
+    case settingsMaximumLines = "settings.maximum_lines"
+    case settingsManualCompletion = "settings.manual_completion"
+    case settingsAcceptCompletion = "settings.accept_completion"
+    case settingsPolishPrompt = "settings.polish_prompt"
+    case settingsPolishPromptHint = "settings.polish_prompt.hint"
+    case settingsModelAPIConfiguration = "settings.model_api_configuration"
+    case settingsAIPolish = "settings.ai_polish"
+    case settingsUsagePeriod = "settings.usage_period"
+    case settingsAIPolishDefaultPrompt = "settings.ai_polish.default_prompt"
+    case usageToday = "usage.today"
+    case usageWeek = "usage.week"
+    case usageMonth = "usage.month"
+    case usageCustom = "usage.custom"
+    case usageStart = "usage.start"
+    case usageEnd = "usage.end"
+    case usageFIMInput = "usage.fim_input"
+    case usageFIMOutput = "usage.fim_output"
+    case usageFIMTokens = "usage.fim_tokens"
+    case usageFIMRequests = "usage.fim_requests"
+    case usageCueOpens = "usage.cue_opens"
     case shortcutToggle = "shortcut.toggle"
     case shortcutPrevious = "shortcut.previous"
     case shortcutNext = "shortcut.next"
@@ -88,7 +122,7 @@ public enum CueLocalization {
     ) -> String {
         let format = string(
             .characterCount,
-            fallback: "characters: %lld",
+            fallback: "ch: %lld",
             localization: localization
         )
         return String(format: format, locale: Locale.current, Int64(count))

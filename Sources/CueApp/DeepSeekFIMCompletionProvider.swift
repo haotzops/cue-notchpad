@@ -33,6 +33,7 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider {
     private let session: URLSession
     private let endpoint = URL(string: "https://api.deepseek.com/beta/completions")!
     private let modelsEndpoint = URL(string: "https://api.deepseek.com/models")!
+    private let chatEndpoint = URL(string: "https://api.deepseek.com/chat/completions")!
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -72,6 +73,22 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider {
         guard (200 ..< 300).contains(httpResponse.statusCode) else {
             throw DeepSeekFIMError.httpStatus(httpResponse.statusCode)
         }
+    }
+
+    func expandPrompt(_ text: String, instruction: String, model: String, apiKey: String) async throws -> String {
+        var request = URLRequest(url: chatEndpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "messages": [["role": "system", "content": instruction], ["role": "user", "content": text]], "stream": false])
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw DeepSeekFIMError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else { throw DeepSeekFIMError.httpStatus(http.statusCode) }
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let choices = object?["choices"] as? [[String: Any]]
+        let message = choices?.first?["message"] as? [String: Any]
+        guard let content = message?["content"] as? String, !content.isEmpty else { throw DeepSeekFIMError.invalidResponse }
+        return content
     }
 
     func streamCompletion(_ request: InlineCompletionRequest, apiKey: String) async -> AsyncThrowingStream<InlineCompletionEvent, Error> {

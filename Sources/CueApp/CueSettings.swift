@@ -109,6 +109,13 @@ final class CueSettings: ObservableObject {
         didSet { Self.defaults.set(min(max(inlineCompletionMaximumLines, 1), 100), forKey: Keys.inlineCompletionMaximumLines) }
     }
 
+    @Published var promptExpansionModel: String? {
+        didSet { Self.defaults.set(promptExpansionModel, forKey: Keys.promptExpansionModel) }
+    }
+    @Published var promptExpansionInstruction: String {
+        didSet { Self.defaults.set(promptExpansionInstruction, forKey: Keys.promptExpansionInstruction) }
+    }
+
     @Published var inlineCompletionModel: String? {
         didSet {
             if let inlineCompletionModel {
@@ -131,6 +138,15 @@ final class CueSettings: ObservableObject {
     }
     @Published var nextShortcut: CueShortcut {
         didSet { save(nextShortcut, key: Keys.nextShortcut) }
+    }
+    @Published var inlineCompletionShortcut: CueShortcut {
+        didSet { save(inlineCompletionShortcut, key: Keys.inlineCompletionShortcut) }
+    }
+    @Published var inlineCompletionAcceptShortcut: CueShortcut {
+        didSet { save(inlineCompletionAcceptShortcut, key: Keys.inlineCompletionAcceptShortcut) }
+    }
+    @Published var promptExpansionShortcut: CueShortcut {
+        didSet { save(promptExpansionShortcut, key: Keys.promptExpansionShortcut) }
     }
 
     var localizationIdentifier: String? { language.localizationIdentifier }
@@ -167,19 +183,19 @@ final class CueSettings: ObservableObject {
             Keys.editorFontSize: Self.defaultEditorFontSize,
             Keys.insertsSpacesBetweenChineseAndEnglish: false,
             Keys.inlineCompletionEnabled: false,
-            Keys.inlineCompletionTriggerMode: InlineCompletionTriggerMode.automatic.rawValue,
+            Keys.inlineCompletionTriggerMode: InlineCompletionTriggerMode.manual.rawValue,
             Keys.inlineCompletionDelayMilliseconds: 200.0,
-            Keys.inlineCompletionMaximumLines: 3,
+            Keys.inlineCompletionMaximumLines: 1,
+            Keys.promptExpansionInstruction: "在不改变原意的前提下，润色并扩写以下 prompt；只输出最终 prompt，不要解释。",
         ])
 
         language = CueLanguage(
             rawValue: Self.defaults.string(forKey: Keys.language) ?? "system"
         ) ?? .system
         let storedWidth = Self.defaults.double(forKey: Keys.windowWidth)
-        windowWidth = storedWidth == 650 ? Self.defaultWindowWidth : min(max(storedWidth, 420), 1_200)
+        windowWidth = min(max(storedWidth, 420), 1_200)
         let storedHeight = Self.defaults.double(forKey: Keys.windowHeight)
-        // Migrate only previous shipped defaults; other intentional user values remain untouched.
-        windowHeight = storedHeight == 180 ? Self.defaultWindowHeight : min(max(storedHeight, Self.minimumWindowHeight), 800)
+        windowHeight = min(max(storedHeight, Self.minimumWindowHeight), 800)
         overflowBehavior = CueOverflowBehavior(
             rawValue: Self.defaults.string(forKey: Keys.overflowBehavior) ?? "scrollable"
         ) ?? .scrollable
@@ -191,11 +207,28 @@ final class CueSettings: ObservableObject {
         inlineCompletionTriggerMode = InlineCompletionTriggerMode(rawValue: Self.defaults.string(forKey: Keys.inlineCompletionTriggerMode) ?? "automatic") ?? .automatic
         inlineCompletionDelayMilliseconds = min(max(Self.defaults.double(forKey: Keys.inlineCompletionDelayMilliseconds), 0), 5_000)
         inlineCompletionMaximumLines = min(max(Self.defaults.integer(forKey: Keys.inlineCompletionMaximumLines), 1), 100)
+        promptExpansionModel = Self.defaults.string(forKey: Keys.promptExpansionModel)
+        let legacyDefaultPolishPrompt = "在不改变原意的前提下，润色并扩写以下 prompt；只输出最终 prompt，不要解释。"
+        let localizedDefaultPolishPrompt = CueLocalization.string(
+            .settingsAIPolishDefaultPrompt,
+            fallback: "Polish and expand the following prompt without changing its meaning. Output only the final prompt, with no explanation.",
+            localization: Self.defaults.string(forKey: Keys.language)
+        )
+        let storedPolishPrompt = Self.defaults.string(forKey: Keys.promptExpansionInstruction)
+        promptExpansionInstruction = (storedPolishPrompt == nil || storedPolishPrompt == legacyDefaultPolishPrompt)
+            ? localizedDefaultPolishPrompt
+            : storedPolishPrompt!
         inlineCompletionModel = Self.defaults.string(forKey: Keys.inlineCompletionModel)
-        inlineCompletionKeyConfigured = (try? CueKeychain.loadDeepSeekAPIKey()) != nil
+        inlineCompletionKeyConfigured = (try? CueAPIKeyStore.loadDeepSeekAPIKey()) != nil
         toggleShortcut = Self.loadShortcut(key: Keys.toggleShortcut, fallback: .toggleDefault)
         previousShortcut = Self.loadShortcut(key: Keys.previousShortcut, fallback: .previousDefault)
         nextShortcut = Self.loadShortcut(key: Keys.nextShortcut, fallback: .nextDefault)
+        inlineCompletionShortcut = Self.loadShortcut(
+            key: Keys.inlineCompletionShortcut,
+            fallback: .inlineCompletionDefault
+        )
+        inlineCompletionAcceptShortcut = Self.loadShortcut(key: Keys.inlineCompletionAcceptShortcut, fallback: CueShortcut(keyCode: 48, modifiers: 0))
+        promptExpansionShortcut = Self.loadShortcut(key: Keys.promptExpansionShortcut, fallback: .promptExpansionDefault)
         if inlineCompletionEnabled { refreshDeepSeekModelsIfPossible() }
     }
 
@@ -206,9 +239,9 @@ final class CueSettings: ObservableObject {
             return
         }
         do {
-            try CueKeychain.saveDeepSeekAPIKey(trimmed)
+            try CueAPIKeyStore.saveDeepSeekAPIKey(trimmed)
             inlineCompletionKeyConfigured = true
-            inlineCompletionStatus = localized(.settingsAPIKeySaved, fallback: "API key saved in Keychain.")
+            inlineCompletionStatus = localized(.settingsAPIKeySaved, fallback: "API key saved in local configuration.")
             refreshDeepSeekModelsIfPossible()
         } catch {
             inlineCompletionStatus = error.localizedDescription
@@ -216,7 +249,7 @@ final class CueSettings: ObservableObject {
     }
 
     func testDeepSeekAPIKey() {
-        guard let apiKey = try? CueKeychain.loadDeepSeekAPIKey() else {
+        guard let apiKey = try? CueAPIKeyStore.loadDeepSeekAPIKey() else {
             inlineCompletionStatus = localized(.settingsAPIKeyMissing, fallback: "Enter an API key before saving.")
             return
         }
@@ -242,7 +275,7 @@ final class CueSettings: ObservableObject {
     }
 
     func refreshDeepSeekModelsIfPossible() {
-        guard let apiKey = try? CueKeychain.loadDeepSeekAPIKey(), !isLoadingInlineCompletionModels else { return }
+        guard let apiKey = try? CueAPIKeyStore.loadDeepSeekAPIKey(), !isLoadingInlineCompletionModels else { return }
         isLoadingInlineCompletionModels = true
         inlineCompletionStatus = localized(.settingsLoadingModels, fallback: "Loading available models…")
         Task { @MainActor [weak self] in
@@ -272,7 +305,7 @@ final class CueSettings: ObservableObject {
 
     func removeDeepSeekAPIKey() {
         do {
-            try CueKeychain.removeDeepSeekAPIKey()
+            try CueAPIKeyStore.removeDeepSeekAPIKey()
             inlineCompletionKeyConfigured = false
             inlineCompletionEnabled = false
             inlineCompletionModel = nil
@@ -311,9 +344,14 @@ final class CueSettings: ObservableObject {
         static let inlineCompletionTriggerMode = "inlineCompletionTriggerMode"
         static let inlineCompletionDelayMilliseconds = "inlineCompletionDelayMilliseconds"
         static let inlineCompletionMaximumLines = "inlineCompletionMaximumLines"
+        static let promptExpansionModel = "promptExpansionModel"
+        static let promptExpansionInstruction = "promptExpansionInstruction"
         static let inlineCompletionModel = "inlineCompletionModel"
         static let toggleShortcut = "toggleShortcut"
         static let previousShortcut = "previousShortcut"
         static let nextShortcut = "nextShortcut"
+        static let inlineCompletionShortcut = "inlineCompletionShortcut"
+        static let inlineCompletionAcceptShortcut = "inlineCompletionAcceptShortcut"
+        static let promptExpansionShortcut = "promptExpansionShortcut"
     }
 }

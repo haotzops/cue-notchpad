@@ -2,7 +2,7 @@
 "prompt.placeholder" = "Write a prompt…";
 "action.cancel" = "cancel";
 "action.done" = "done";
-"character_count.format" = "characters: %lld";
+"character_count.format" = "ch: %lld";
 "token_count.format" = "token: %lld";
 "error.no_display" = "cue: no display is available";
 "settings.title" = "Settings";
@@ -30,10 +30,10 @@
 "settings.deepseek_api_key" = "DeepSeek API Key";
 "settings.save_api_key" = "Save API Key";
 "settings.remove_api_key" = "Remove API Key";
-"settings.api_key_configured" = "Saved in Keychain";
+"settings.api_key_configured" = "Saved in local configuration";
 "settings.api_key_not_configured" = "Not configured";
 "settings.api_key_missing" = "Enter an API key before saving.";
-"settings.api_key_saved" = "API key saved in Keychain.";
+"settings.api_key_saved" = "API key saved in local configuration.";
 "settings.api_key_removed" = "API key removed.";
 "settings.api_key_rejected" = "DeepSeek API key was rejected.";
 "settings.inline_completion_rate_limited" = "DeepSeek is rate limiting completion requests.";
@@ -59,3 +59,62 @@
 "menu.copy" = "Copy";
 "menu.paste" = "Paste";
 "menu.select_all" = "Select All";
+
+"settings.page.general" = "General";
+
+"settings.page.ai" = "AI";
+
+"settings.page.usage" = "Usage";
+
+"settings.trigger_mode" = "Trigger mode";
+
+"settings.trigger.automatic" = "Automatic";
+
+"settings.trigger.manual" = "Shortcut only";
+
+"settings.trigger_delay" = "Automatic trigger delay";
+
+"settings.maximum_lines" = "Maximum completion lines";
+
+"settings.manual_completion" = "Trigger completion";
+
+"settings.accept_completion" = "Accept completion";
+
+"usage.today" = "Today";
+
+"usage.week" = "Last 7 days";
+
+"usage.month" = "Last 30 days";
+
+"usage.custom" = "Custom";
+
+"usage.start" = "Start";
+
+"usage.end" = "End";
+
+"usage.fim_input" = "FIM input tokens";
+
+"usage.fim_output" = "FIM output tokens";
+
+"usage.fim_tokens" = "FIM tokens";
+
+"usage.fim_requests" = "FIM API requests";
+
+"usage.cue_opens" = "Cue opens";
+
+"settings.polish_prompt" = "Polishing prompt";
+"settings.polish_prompt.hint" = "Changes save automatically and apply to the next polish request.";
+
+"settings.model_api_configuration" = "Model API Configuration";
+"settings.ai_polish" = "AI Polish";
+"settings.usage_period" = "Statistics period";
+"settings.ai_polish.default_prompt" = "Polish and expand the following prompt without changing its meaning. Output only the final prompt, with no explanation.";
+
+"settings.system_font_regular" = "System Font Regular";
+
+"settings.fim" = "FIM";
+"unit.milliseconds" = "ms";
+"unit.points" = "pt";
+"language.english" = "English";
+"language.simplified_chinese" = "Simplified Chinese";
+"fim_usage.format" = "FIM: 0/0";

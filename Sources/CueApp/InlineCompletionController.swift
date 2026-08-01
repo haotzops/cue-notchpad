@@ -11,6 +11,11 @@ final class InlineCompletionController {
     private var requestTask: Task<Void, Never>?
     private var revision = 0
     private var requestID = 0
+    private var lastRequestStartedAt: Date?
+    private var lastRequestCancelledAt: Date?
+    private let requestCooldown: TimeInterval = 1.5
+    private let cancellationQuietPeriod: TimeInterval = 1.0
+    var onUsage: ((Int, Int) -> Void)?
 
     init(provider: any InlineCompletionProvider = DeepSeekFIMCompletionProvider()) {
         self.provider = provider
@@ -24,6 +29,7 @@ final class InlineCompletionController {
     func attach(to textView: CueTextView, settings: CueSettings) {
         self.textView = textView
         self.settings = settings
+        textView.inlineCompletionTriggerShortcut = settings.inlineCompletionShortcut
         textView.onAcceptInlineCompletion = { [weak self] in self?.accept() ?? false }
         textView.onDismissInlineCompletion = { [weak self] in self?.dismiss() ?? false }
         textView.onRequestInlineCompletion = { [weak self] in self?.requestManually() ?? false }
@@ -31,6 +37,7 @@ final class InlineCompletionController {
 
     func updateSettings(_ settings: CueSettings) {
         self.settings = settings
+        textView?.inlineCompletionTriggerShortcut = settings.inlineCompletionShortcut
         if !settings.inlineCompletionEnabled { invalidate() }
     }
 
@@ -61,7 +68,7 @@ final class InlineCompletionController {
               !textView.hasMarkedText(),
               textView.selectedRange().length == 0,
               !textView.string.isEmpty,
-              (try? CueKeychain.loadDeepSeekAPIKey()) != nil
+              (try? CueAPIKeyStore.loadDeepSeekAPIKey()) != nil
         else { return }
 
         let expectedRevision = revision
@@ -69,8 +76,17 @@ final class InlineCompletionController {
             if !force {
                 try? await Task.sleep(for: .milliseconds(Int(settings.inlineCompletionDelayMilliseconds)))
             }
+            guard !Task.isCancelled, let self else { return }
+            let now = Date.now
+            let cooldown = max(
+                self.lastRequestStartedAt?.addingTimeInterval(self.requestCooldown) ?? now,
+                self.lastRequestCancelledAt?.addingTimeInterval(self.cancellationQuietPeriod) ?? now
+            )
+            if !force, cooldown > now {
+                try? await Task.sleep(for: .seconds(cooldown.timeIntervalSince(now)))
+            }
             guard !Task.isCancelled else { return }
-            self?.startRequest(expectedRevision: expectedRevision)
+            self.startRequest(expectedRevision: expectedRevision)
         }
     }
 
@@ -84,11 +100,13 @@ final class InlineCompletionController {
                 selection: textView.selectedRange()
               ),
               !context.prefix.isEmpty,
-              let apiKey = try? CueKeychain.loadDeepSeekAPIKey(),
+              let apiKey = try? CueAPIKeyStore.loadDeepSeekAPIKey(),
               let model = settings.inlineCompletionModel
         else { return }
 
         requestID += 1
+        lastRequestStartedAt = .now
+        CueUsageStore.shared.recordFIMRequest(model: model)
         let expectedRequestID = requestID
         let expectedSelection = textView.selectedRange()
         let request = InlineCompletionRequest(
@@ -117,6 +135,7 @@ final class InlineCompletionController {
                             inputTokens: usage.promptTokens,
                             outputTokens: usage.completionTokens
                         )
+                        self?.onUsage?(usage.promptTokens, usage.completionTokens)
                     }
                 }
             } catch is CancellationError {
@@ -194,6 +213,7 @@ final class InlineCompletionController {
     private func invalidate(clearRevision: Bool = true) {
         if clearRevision { revision += 1 }
         debounceTask?.cancel()
+        if requestTask != nil { lastRequestCancelledAt = .now }
         requestTask?.cancel()
         debounceTask = nil
         requestTask = nil

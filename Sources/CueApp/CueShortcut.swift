@@ -10,6 +10,8 @@ struct CueShortcut: Codable, Equatable {
     static let toggleDefault = CueShortcut(keyCode: 8, modifiers: NSEvent.ModifierFlags.command.union(.option).rawValue)
     static let previousDefault = CueShortcut(keyCode: 123, modifiers: NSEvent.ModifierFlags.command.union(.option).rawValue)
     static let nextDefault = CueShortcut(keyCode: 124, modifiers: NSEvent.ModifierFlags.command.union(.option).rawValue)
+    static let inlineCompletionDefault = CueShortcut(keyCode: 48, modifiers: NSEvent.ModifierFlags.shift.rawValue)
+    static let promptExpansionDefault = CueShortcut(keyCode: 14, modifiers: NSEvent.ModifierFlags.option.rawValue)
 
     var modifierFlags: NSEvent.ModifierFlags {
         NSEvent.ModifierFlags(rawValue: modifiers).intersection(.deviceIndependentFlagsMask)
@@ -179,11 +181,13 @@ final class CueGlobalShortcutController {
 struct CueShortcutRecorder: NSViewRepresentable {
     @Binding var shortcut: CueShortcut
     let recordingPrompt: String
+    var allowsUnmodifiedKeys = false
 
     func makeNSView(context: Context) -> CueShortcutRecorderButton {
         let button = CueShortcutRecorderButton()
         button.onChange = { shortcut = $0 }
         button.recordingPrompt = recordingPrompt
+        button.allowsUnmodifiedKeys = allowsUnmodifiedKeys
         button.shortcut = shortcut
         return button
     }
@@ -191,6 +195,7 @@ struct CueShortcutRecorder: NSViewRepresentable {
     func updateNSView(_ button: CueShortcutRecorderButton, context: Context) {
         button.onChange = { shortcut = $0 }
         button.recordingPrompt = recordingPrompt
+        button.allowsUnmodifiedKeys = allowsUnmodifiedKeys
         if !button.isRecording { button.shortcut = shortcut }
     }
 }
@@ -199,6 +204,7 @@ final class CueShortcutRecorderButton: NSButton {
     var onChange: (CueShortcut) -> Void = { _ in }
     var shortcut: CueShortcut = .toggleDefault { didSet { refreshTitle() } }
     var recordingPrompt = "Type shortcut…"
+    var allowsUnmodifiedKeys = false
     fileprivate var isRecording = false
 
     override init(frame frameRect: NSRect) {
@@ -229,7 +235,7 @@ final class CueShortcutRecorderButton: NSButton {
         }
         let allowed = NSEvent.ModifierFlags.command.union(.option).union(.control).union(.shift)
         let modifiers = event.modifierFlags.intersection(allowed)
-        guard !modifiers.isEmpty else { NSSound.beep(); return }
+        guard allowsUnmodifiedKeys || !modifiers.isEmpty else { NSSound.beep(); return }
         shortcut = CueShortcut(keyCode: event.keyCode, modifiers: modifiers.rawValue)
         onChange(shortcut)
         endRecording()

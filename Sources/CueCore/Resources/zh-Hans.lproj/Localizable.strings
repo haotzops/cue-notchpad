@@ -30,10 +30,10 @@
 "settings.deepseek_api_key" = "DeepSeek API Key";
 "settings.save_api_key" = "保存 API Key";
 "settings.remove_api_key" = "移除 API Key";
-"settings.api_key_configured" = "已保存到钥匙串";
+"settings.api_key_configured" = "已保存到本地配置文件";
 "settings.api_key_not_configured" = "尚未配置";
 "settings.api_key_missing" = "请先输入 API Key。";
-"settings.api_key_saved" = "API Key 已保存到钥匙串。";
+"settings.api_key_saved" = "API Key 已保存到本地配置文件。";
 "settings.api_key_removed" = "API Key 已移除。";
 "settings.api_key_rejected" = "DeepSeek 拒绝了此 API Key。";
 "settings.inline_completion_rate_limited" = "DeepSeek 正在限制补全请求频率。";
@@ -59,3 +59,62 @@
 "menu.copy" = "拷贝";
 "menu.paste" = "粘贴";
 "menu.select_all" = "全选";
+
+"settings.page.general" = "通用";
+
+"settings.page.ai" = "AI";
+
+"settings.page.usage" = "使用统计";
+
+"settings.trigger_mode" = "触发方式";
+
+"settings.trigger.automatic" = "自动";
+
+"settings.trigger.manual" = "仅快捷键";
+
+"settings.trigger_delay" = "自动触发延迟";
+
+"settings.maximum_lines" = "最大补全行数";
+
+"settings.manual_completion" = "手动触发补全";
+
+"settings.accept_completion" = "接受补全";
+
+"usage.today" = "今日";
+
+"usage.week" = "近 7 天";
+
+"usage.month" = "近 30 天";
+
+"usage.custom" = "自定义";
+
+"usage.start" = "开始";
+
+"usage.end" = "结束";
+
+"usage.fim_input" = "FIM 输入 token";
+
+"usage.fim_output" = "FIM 输出 token";
+
+"usage.fim_tokens" = "FIM token";
+
+"usage.fim_requests" = "FIM API 调用次数";
+
+"usage.cue_opens" = "Cue 打开次数";
+
+"settings.polish_prompt" = "润色提示词";
+"settings.polish_prompt.hint" = "修改会自动保存，并在下次润色时应用。";
+
+"settings.model_api_configuration" = "模型 API 配置";
+"settings.ai_polish" = "AI 润色";
+"settings.usage_period" = "统计周期";
+"settings.ai_polish.default_prompt" = "在不改变原意的前提下，润色并扩写以下 prompt；只输出最终 prompt，不要解释。";
+
+"settings.system_font_regular" = "系统字体常规体";
+
+"settings.fim" = "FIM";
+"unit.milliseconds" = "毫秒";
+"unit.points" = "pt";
+"language.english" = "英文";
+"language.simplified_chinese" = "简体中文";
+"fim_usage.format" = "FIM：0/0";

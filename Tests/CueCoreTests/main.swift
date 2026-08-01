@@ -94,7 +94,7 @@ expect(
     "Simplified Chinese prompt label"
 )
 expect(
-    CueLocalization.characterCount(1, localization: "en") == "characters: 1",
+    CueLocalization.characterCount(1, localization: "en") == "ch: 1",
     "English character count"
 )
 expect(

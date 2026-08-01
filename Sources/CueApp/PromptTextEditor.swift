@@ -33,6 +33,23 @@ struct PromptTextEditor: NSViewRepresentable {
         textView.onCancel = onCancel
         textView.onHide = onHide
         textView.onOpenSettings = onOpenSettings
+        textView.promptExpansionShortcut = settings.promptExpansionShortcut
+        textView.inlineCompletionAcceptShortcut = settings.inlineCompletionAcceptShortcut
+        textView.onExpandPrompt = { [weak textView, weak model, weak settings] in
+            guard let textView, let model, let settings,
+                  !textView.string.isEmpty,
+                  let key = try? CueAPIKeyStore.loadDeepSeekAPIKey(),
+                  let selectedModel = settings.promptExpansionModel
+            else { return }
+            let original = textView.string
+            Task { @MainActor in
+                guard let expanded = try? await DeepSeekFIMCompletionProvider().expandPrompt(original, instruction: settings.promptExpansionInstruction, model: selectedModel, apiKey: key), textView.string == original else { return }
+                textView.string = expanded
+                textView.setSelectedRange(NSRange(location: expanded.utf16.count, length: 0))
+                model.acceptCommittedText(expanded)
+                textView.didChangeText()
+            }
+        }
         textView.string = model.text
         textView.font = editorFont
         textView.textColor = .white
@@ -64,6 +81,9 @@ struct PromptTextEditor: NSViewRepresentable {
         )
         textView.textContainer?.widthTracksTextView = true
         textView.identifier = NSUserInterfaceItemIdentifier("cue.prompt.editor")
+        context.coordinator.inlineCompletionController.onUsage = { [weak model] input, output in
+            model?.recordFIMUsage(input: input, output: output)
+        }
         context.coordinator.inlineCompletionController.attach(to: textView, settings: settings)
         scrollView.documentView = textView
         applyOverflowBehavior(to: scrollView)
@@ -79,7 +99,12 @@ struct PromptTextEditor: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
+        context.coordinator.inlineCompletionController.onUsage = { [weak model] input, output in
+            model?.recordFIMUsage(input: input, output: output)
+        }
         context.coordinator.inlineCompletionController.updateSettings(settings)
+        (scrollView.documentView as? CueTextView)?.promptExpansionShortcut = settings.promptExpansionShortcut
+        (scrollView.documentView as? CueTextView)?.inlineCompletionAcceptShortcut = settings.inlineCompletionAcceptShortcut
         applyOverflowBehavior(to: scrollView)
         guard let textView = scrollView.documentView as? NSTextView else { return }
         context.coordinator.applyExternalDocumentIfNeeded(to: textView)
@@ -185,9 +210,13 @@ struct CueInlineCompletion: Equatable {
 
 final class CueTextView: NSTextView {
     var onSubmit: (() -> Void)?
+    var inlineCompletionTriggerShortcut = CueShortcut.inlineCompletionDefault
+    var inlineCompletionAcceptShortcut = CueShortcut(keyCode: 48, modifiers: 0)
     var onCancel: (() -> Void)?
     var onHide: (() -> Void)?
     var onOpenSettings: (() -> Void)?
+    var promptExpansionShortcut = CueShortcut.promptExpansionDefault
+    var onExpandPrompt: (() -> Void)?
     var onAcceptInlineCompletion: (() -> Bool)?
     var onRequestInlineCompletion: (() -> Bool)?
     var onDismissInlineCompletion: (() -> Bool)?
@@ -227,8 +256,12 @@ final class CueTextView: NSTextView {
             width: bounds.maxX - start.x,
             height: bounds.maxY - start.y
         )
-        backgroundColor.setFill()
-        redrawRect.fill()
+        if let context = NSGraphicsContext.current {
+            context.saveGraphicsState()
+            context.compositingOperation = .clear
+            redrawRect.fill()
+            context.restoreGraphicsState()
+        }
         manager.drawGlyphs(
             forGlyphRange: glyphRange,
             at: NSPoint(x: textContainerInset.width, y: textContainerInset.height)
@@ -256,9 +289,11 @@ final class CueTextView: NSTextView {
     override func keyDown(with event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let isReturn = event.keyCode == 36 || event.keyCode == 76
-        if event.keyCode == 48, flags.isEmpty, !hasMarkedText() {
-            if onAcceptInlineCompletion?() == true || onRequestInlineCompletion?() == true { return }
-        }
+        if event.keyCode == inlineCompletionAcceptShortcut.keyCode, flags == inlineCompletionAcceptShortcut.modifierFlags, !hasMarkedText(), onAcceptInlineCompletion?() == true { return }
+        let triggerShortcutMatches = event.keyCode == inlineCompletionTriggerShortcut.keyCode && flags == inlineCompletionTriggerShortcut.modifierFlags
+        if triggerShortcutMatches, !hasMarkedText(), onRequestInlineCompletion?() == true { return }
+        let expansionShortcutMatches = event.keyCode == promptExpansionShortcut.keyCode && flags == promptExpansionShortcut.modifierFlags
+        if expansionShortcutMatches, !hasMarkedText() { onExpandPrompt?(); return }
         if event.keyCode == 53, !hasMarkedText(), onDismissInlineCompletion?() == true { return }
         if event.keyCode == 43, flags == .command, !hasMarkedText() { onOpenSettings?(); return }
         if event.keyCode == 4, flags == .command, !hasMarkedText() { onHide?(); return }

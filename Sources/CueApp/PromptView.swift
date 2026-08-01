@@ -30,6 +30,8 @@ final class PromptModel: ObservableObject {
         didSet { scheduleTokenCount() }
     }
     @Published var tokenCount = 0
+    @Published private(set) var fimInputTokens = 0
+    @Published private(set) var fimOutputTokens = 0
     @Published private(set) var editorContentHeight: CGFloat = 42
 
     private var tokenRequest: TokenCountCancellation?
@@ -49,6 +51,11 @@ final class PromptModel: ObservableObject {
     func acceptCommittedText(_ value: String) {
         guard text != value else { return }
         text = value
+    }
+
+    func recordFIMUsage(input: Int, output: Int) {
+        fimInputTokens += input
+        fimOutputTokens += output
     }
 
     func updateEditorContentHeight(_ value: CGFloat) {
@@ -145,7 +152,6 @@ final class PromptPresentation: ObservableObject {
 
 struct PromptView: View {
     @ObservedObject var presentation: PromptPresentation
-    @ObservedObject private var usage = CueUsageStore.shared
     @ObservedObject var settings: CueSettings
     let screenGeometry: NotchScreenGeometry
     let onSubmit: () -> Void
@@ -258,9 +264,18 @@ struct PromptView: View {
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.28))
 
-                Text("FIM: \(usage.totals(from: .distantPast).total)")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.28))
+                if settings.inlineCompletionEnabled {
+                    Text("·")
+                        .foregroundStyle(.white.opacity(0.18))
+
+                    Text(String(
+                        format: CueLocalization.string(.fimUsage, fallback: "FIM: %lld/%lld", localization: settings.localizationIdentifier),
+                        Int64(presentation.model.fimInputTokens),
+                        Int64(presentation.model.fimOutputTokens)
+                    ))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.28))
+                }
 
                 Spacer()
 
