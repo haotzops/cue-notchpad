@@ -25,13 +25,11 @@ protocol DeepSeekService: Sendable {
 
 enum DeepSeekFIMError: LocalizedError, Equatable, Sendable {
     case invalidResponse
-    case unsupportedModel
     case httpStatus(Int)
 
     var errorDescription: String? {
         switch self {
         case .invalidResponse: "The completion service returned an invalid response."
-        case .unsupportedModel: "The selected model does not support DeepSeek FIM."
         case .httpStatus(let status): "The completion service returned HTTP \(status)."
         }
     }
@@ -61,11 +59,10 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider, DeepSeekService {
         let (data, response) = try await session.data(for: request)
         try validate(response)
         let list = try JSONDecoder().decode(DeepSeekModelList.self, from: data)
-        return list.data.map(\.id).filter(DeepSeekFIM.supports(model:))
+        return Array(Set(list.data.map(\.id).filter { !$0.isEmpty })).sorted()
     }
 
     func validate(apiKey: String, model: String) async throws {
-        guard DeepSeekFIM.supports(model: model) else { throw DeepSeekFIMError.unsupportedModel }
         var request = makeFIMRequest(apiKey: apiKey, body: DeepSeekFIMRequest(
             model: model,
             prompt: "Cue",
@@ -102,9 +99,6 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider, DeepSeekService {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    guard DeepSeekFIM.supports(model: request.model) else {
-                        throw DeepSeekFIMError.unsupportedModel
-                    }
                     let body = DeepSeekFIMRequest(
                         model: request.model,
                         prompt: request.context.prefix,

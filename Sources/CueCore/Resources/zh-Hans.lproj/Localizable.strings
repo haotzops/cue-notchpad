@@ -41,6 +41,7 @@
 "settings.inline_completion_rate_limited" = "DeepSeek 正在限制补全请求频率。";
 "settings.inline_completion_unavailable" = "行间补全暂时不可用。";
 "settings.test_api_key" = "测试连接";
+"settings.test_model" = "测试模型";
 "settings.testing_api_key" = "正在测试 API Key…";
 "settings.api_key_valid" = "DeepSeek API Key 有效。";
 "settings.overflow_behavior" = "溢出行为";

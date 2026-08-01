@@ -41,6 +41,7 @@
 "settings.inline_completion_rate_limited" = "DeepSeek is rate limiting completion requests.";
 "settings.inline_completion_unavailable" = "Inline completion is temporarily unavailable.";
 "settings.test_api_key" = "Test Connection";
+"settings.test_model" = "Test Model";
 "settings.testing_api_key" = "Testing API key…";
 "settings.api_key_valid" = "DeepSeek API key is valid.";
 "settings.overflow_behavior" = "Editor Height";

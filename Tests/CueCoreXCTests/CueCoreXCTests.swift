@@ -10,13 +10,13 @@ final class CueCoreXCTests: XCTestCase {
 
     func testFIMRequestUsesDocumentedBounds() {
         let request = DeepSeekFIMRequest(
-            model: DeepSeekFIM.model,
+            model: "user-selected-model",
             prompt: "prefix",
             suffix: "suffix",
             maxTokens: DeepSeekFIM.maximumTokens + 1
         )
         XCTAssertEqual(request.maxTokens, DeepSeekFIM.maximumTokens)
-        XCTAssertTrue(DeepSeekFIM.supports(model: request.model))
+        XCTAssertEqual(request.model, "user-selected-model")
     }
 }
 #endif

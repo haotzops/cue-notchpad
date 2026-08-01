@@ -26,15 +26,6 @@ struct CueAISettingsView: View {
                 }
                 .disabled(!settings.inlineCompletionKeyConfigured || settings.isLoadingInlineCompletionModels)
 
-                Button(settings.localized(.settingsTestAPIKey)) {
-                    settings.testDeepSeekAPIKey()
-                }
-                .disabled(
-                    !settings.inlineCompletionKeyConfigured
-                        || settings.inlineCompletionModel == nil
-                        || settings.isTestingInlineCompletionConnection
-                )
-
                 Button(settings.localized(.settingsRemoveAPIKey)) {
                     settings.removeDeepSeekAPIKey()
                 }
@@ -85,6 +76,15 @@ struct CueAISettingsView: View {
                         ProgressView()
                             .controlSize(.small)
                     }
+
+                    Button(settings.localized(.settingsTestModel)) {
+                        settings.testDeepSeekAPIKey()
+                    }
+                    .disabled(
+                        !settings.inlineCompletionKeyConfigured
+                            || settings.inlineCompletionModel == nil
+                            || settings.isTestingInlineCompletionConnection
+                    )
                 }
 
                 Picker(settings.localized(.settingsTriggerMode), selection: $settings.inlineCompletionTriggerMode) {

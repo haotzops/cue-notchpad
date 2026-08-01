@@ -187,8 +187,6 @@ expect(inlineContext?.prefix == "你好 👨‍👩‍👧‍👦hello", "inline
 expect(inlineContext?.suffix == "世界", "inline completion suffix")
 expect(InlineCompletionContextBuilder.make(document: inlineDocument, selection: NSRange(location: 1, length: 1)) == nil, "inline completion rejects selected text")
 
-expect(DeepSeekFIM.supports(model: "deepseek-v4-pro"), "official FIM model is accepted")
-expect(!DeepSeekFIM.supports(model: "other-model"), "unsupported FIM model is rejected")
 let fimRequest = DeepSeekFIMRequest(model: "deepseek-v4-pro", prompt: "before", suffix: "after")
 if let encodedRequest = try? JSONEncoder().encode(fimRequest),
    let requestObject = try? JSONSerialization.jsonObject(with: encodedRequest) as? [String: Any]
@@ -199,7 +197,8 @@ if let encodedRequest = try? JSONEncoder().encode(fimRequest),
 } else {
     expect(false, "FIM request should encode")
 }
-let clampedFIMRequest = DeepSeekFIMRequest(model: "deepseek-v4-pro", prompt: "a", suffix: "", maxTokens: 9_999)
+let clampedFIMRequest = DeepSeekFIMRequest(model: "user-selected-model", prompt: "a", suffix: "", maxTokens: 9_999)
+expect(clampedFIMRequest.model == "user-selected-model", "FIM request preserves the user-selected model")
 expect(clampedFIMRequest.maxTokens == DeepSeekFIM.maximumTokens, "FIM request limits max_tokens to the documented maximum")
 
 let modelsJSON = """

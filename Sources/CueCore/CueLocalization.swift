@@ -51,6 +51,7 @@ public enum CueLocalizedKey: String, CaseIterable, Sendable {
     case settingsInlineCompletionRateLimited = "settings.inline_completion_rate_limited"
     case settingsInlineCompletionUnavailable = "settings.inline_completion_unavailable"
     case settingsTestAPIKey = "settings.test_api_key"
+    case settingsTestModel = "settings.test_model"
     case settingsTestingAPIKey = "settings.testing_api_key"
     case settingsAPIKeyValid = "settings.api_key_valid"
     case settingsOverflowBehavior = "settings.overflow_behavior"

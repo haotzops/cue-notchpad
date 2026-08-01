@@ -33,13 +33,8 @@ public enum InlineCompletionContextBuilder {
 }
 
 public enum DeepSeekFIM {
-    public static let model = "deepseek-v4-pro"
     public static let defaultMaximumTokens = 64
     public static let maximumTokens = 4_096
-
-    public static func supports(model: String) -> Bool {
-        model == Self.model
-    }
 }
 
 public struct DeepSeekFIMRequest: Codable, Equatable, Sendable {
