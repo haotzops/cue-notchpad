@@ -6,11 +6,27 @@ APP_DIR="${APP_DIR:-$HOME/Applications}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 SOURCE_APP="$ROOT/build/Cue Notchpad.app"
 TARGET_APP="$APP_DIR/Cue Notchpad.app"
+PREFERENCES_DOMAIN="io.github.haotzops.cue-notchpad"
+PREFERENCES_BACKUP="$(mktemp "${TMPDIR:-/tmp}/cue-preferences.XXXXXX.plist")"
+HAVE_PREFERENCES=0
+trap 'rm -f "$PREFERENCES_BACKUP"' EXIT
+
+# An installation is never a settings reset. Preserve the complete preference
+# domain explicitly, including future settings that Cue may add.
+if defaults export "$PREFERENCES_DOMAIN" "$PREFERENCES_BACKUP" 2>/dev/null; then
+    HAVE_PREFERENCES=1
+fi
 
 "$ROOT/Scripts/build-app.sh"
 mkdir -p "$APP_DIR" "$BIN_DIR"
-rm -rf "$TARGET_APP"
-cp -R "$SOURCE_APP" "$TARGET_APP"
+# Keep the application directory in place. Removing and recreating a bundle can
+# make Launch Services treat it as a new installation and is unnecessary for an
+# update; ditto replaces bundle contents without touching user preferences.
+ditto "$SOURCE_APP" "$TARGET_APP"
+
+if [[ "$HAVE_PREFERENCES" == 1 ]]; then
+    defaults import "$PREFERENCES_DOMAIN" "$PREFERENCES_BACKUP"
+fi
 
 # Do not symlink the Mach-O executable directly. macOS then sees argv[0] as
 # ~/.local/bin/cue and loses the enclosing app bundle identity, which breaks
