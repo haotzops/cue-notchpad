@@ -14,7 +14,6 @@ struct CueShortcutSettingsView: View {
                 shortcut: $settings.inlineCompletionShortcut,
                 allowsUnmodifiedKeys: true
             )
-            shortcutRow(settings.localized(.settingsAIPolish), shortcut: $settings.promptExpansionShortcut)
             LabeledContent(settings.localized(.settingsAcceptCompletion)) {
                 CueShortcutRecorder(
                     shortcut: $settings.inlineCompletionAcceptShortcut,
@@ -23,6 +22,7 @@ struct CueShortcutSettingsView: View {
                 )
                 .frame(width: 110, height: 24)
             }
+            shortcutRow(settings.localized(.settingsAIPolish), shortcut: $settings.promptExpansionShortcut)
         }
     }
 

@@ -40,6 +40,6 @@ struct CueSettingsView: View {
             }
             .formStyle(.grouped)
         }
-        .frame(minWidth: 500, maxWidth: .infinity, minHeight: 680, maxHeight: .infinity)
+        .frame(minWidth: 500, maxWidth: .infinity, minHeight: 360, maxHeight: .infinity)
     }
 }

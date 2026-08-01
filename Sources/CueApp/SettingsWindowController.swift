@@ -5,7 +5,7 @@ import SwiftUI
 
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
-    private static let contentSize = NSSize(width: 500, height: 680)
+    private static let contentSize = NSSize(width: 500, height: 360)
 
     private let settings: CueSettings
     private let targetScreen: NSScreen
@@ -51,8 +51,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         refreshTitle()
         guard let window else { return }
         window.contentView?.layoutSubtreeIfNeeded()
-        // Center only after the final fixed content size is known; the first
-        // SwiftUI layout must not be allowed to move the window afterwards.
+        // Center after applying the preferred initial size; the SwiftUI form
+        // remains scrollable when a settings page needs more vertical space.
         window.setContentSize(Self.contentSize)
         let visible = targetScreen.visibleFrame
         window.setFrameOrigin(NSPoint(
