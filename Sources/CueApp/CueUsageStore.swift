@@ -55,6 +55,16 @@ final class CueUsageStore: ObservableObject {
         persist()
     }
 
+    /// Destructively clears usage only after the user explicitly confirms it in
+    /// Settings. Future or corrupt archives remain read-only and untouched.
+    func clearUsageStatistics() {
+        guard !isReadOnly else { return }
+        records.removeAll()
+        cueOpenCount = 0
+        cueOpenDates.removeAll()
+        persist()
+    }
+
     func recordCueOpen() {
         guard !isReadOnly else { return }
         cueOpenCount += 1

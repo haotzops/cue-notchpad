@@ -4,6 +4,8 @@ import SwiftUI
 
 struct CueGeneralSettingsView: View {
     @ObservedObject var settings: CueSettings
+    @State private var isConfirmingRestoreAll = false
+    @State private var isConfirmingUsageClear = false
 
     var body: some View {
         Section {
@@ -44,6 +46,10 @@ struct CueGeneralSettingsView: View {
         Text(settings.localized(.settingsSizeHint))
             .font(.footnote)
             .foregroundStyle(.secondary)
+
+        Section {
+            settingsActions
+        }
     }
 
     private var editorFontDisplayName: String {
@@ -73,6 +79,27 @@ struct CueGeneralSettingsView: View {
                     .help(settings.localized(.settingsRestoreDefaultFont))
                 }
             }
+            LabeledContent(settings.localized(.settingsEditorFontSize)) {
+                HStack(spacing: 5) {
+                    TextField(
+                        "",
+                        value: $settings.editorFontSize,
+                        format: .number.precision(.fractionLength(0))
+                    )
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 46)
+                    Text(settings.localized(.unitPoints))
+                        .foregroundStyle(.secondary)
+                    Stepper(
+                        "",
+                        value: $settings.editorFontSize,
+                        in: CueSettings.minimumEditorFontSize ... CueSettings.maximumEditorFontSize,
+                        step: 1
+                    )
+                    .labelsHidden()
+                }
+            }
+            .help(settings.localized(.settingsEditorFontSizeHint))
             Toggle(
                 settings.localized(.settingsChineseEnglishSpacing),
                 isOn: $settings.insertsSpacesBetweenChineseAndEnglish
@@ -86,6 +113,40 @@ struct CueGeneralSettingsView: View {
                     .tag(CueOverflowBehavior.growWithContent)
             }
             .pickerStyle(.segmented)
+        }
+    }
+
+    private var settingsActions: some View {
+        HStack {
+            Button(settings.localized(.settingsRestoreAll)) {
+                isConfirmingRestoreAll = true
+            }
+            .confirmationDialog(
+                settings.localized(.settingsRestoreAllConfirmation),
+                isPresented: $isConfirmingRestoreAll,
+                titleVisibility: .visible
+            ) {
+                Button(settings.localized(.settingsRestoreAll), role: .destructive) {
+                    settings.restoreAllSettings()
+                }
+                Button(settings.localized(.settingsCancel), role: .cancel) {}
+            }
+
+            Spacer()
+
+            Button(settings.localized(.settingsClearUsage)) {
+                isConfirmingUsageClear = true
+            }
+            .confirmationDialog(
+                settings.localized(.settingsClearUsageConfirmation),
+                isPresented: $isConfirmingUsageClear,
+                titleVisibility: .visible
+            ) {
+                Button(settings.localized(.settingsClearUsage), role: .destructive) {
+                    CueUsageStore.shared.clearUsageStatistics()
+                }
+                Button(settings.localized(.settingsCancel), role: .cancel) {}
+            }
         }
     }
 

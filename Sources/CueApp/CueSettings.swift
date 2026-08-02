@@ -184,6 +184,38 @@ final class CueSettings: ObservableObject {
         editorFontSize = Self.defaultEditorFontSize
     }
 
+    func adjustEditorFontSize(by delta: Double) {
+        editorFontSize = min(
+            max(editorFontSize + delta, Self.minimumEditorFontSize),
+            Self.maximumEditorFontSize
+        )
+    }
+
+    /// Explicitly restores application preferences. API keys and usage history
+    /// are separate user data and are intentionally not included.
+    func restoreAllSettings() {
+        language = .system
+        windowWidth = Self.defaultWindowWidth
+        windowHeight = Self.defaultWindowHeight
+        overflowBehavior = .scrollable
+        restoreDefaultEditorFont()
+        insertsSpacesBetweenChineseAndEnglish = false
+        inlineCompletionEnabled = false
+        inlineCompletionTriggerMode = .manual
+        inlineCompletionDelayMilliseconds = 200
+        inlineCompletionMaximumLines = 1
+        inlineCompletionModel = nil
+        promptExpansionModel = nil
+        promptExpansionInstruction = CueLocalization.string(.settingsAIRewriteDefaultPrompt)
+        toggleShortcut = .toggleDefault
+        previousShortcut = .previousDefault
+        nextShortcut = .nextDefault
+        inlineCompletionShortcut = .inlineCompletionDefault
+        inlineCompletionAcceptShortcut = CueShortcut(keyCode: 48, modifiers: 0)
+        promptExpansionShortcut = .promptExpansionDefault
+        inlineCompletionStatus = nil
+    }
+
     private static var defaultEditorFont: NSFont {
         .systemFont(ofSize: CGFloat(defaultEditorFontSize), weight: .regular)
     }
@@ -268,7 +300,7 @@ final class CueSettings: ObservableObject {
         }
     }
 
-    func testDeepSeekAPIKey() {
+    func testDeepSeekFIM() {
         guard let apiKey = try? CueAPIKeyStore.loadDeepSeekAPIKey() else {
             setInlineCompletionStatus(.settingsAPIKeyMissing, style: .error)
             return
@@ -286,7 +318,31 @@ final class CueSettings: ObservableObject {
             do {
                 guard let service = self?.deepSeekService else { return }
                 try await service.validate(apiKey: apiKey, model: model)
-                self?.setInlineCompletionStatus(.settingsAPIKeyValid)
+                self?.setInlineCompletionStatus(.settingsFIMAvailable)
+            } catch {
+                self?.setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
+            }
+        }
+    }
+
+    func checkDeepSeekServiceHealth() {
+        guard let apiKey = try? CueAPIKeyStore.loadDeepSeekAPIKey(),
+              !isTestingInlineCompletionConnection
+        else {
+            if inlineCompletionKeyConfigured == false {
+                setInlineCompletionStatus(.settingsAPIKeyMissing, style: .error)
+            }
+            return
+        }
+
+        isTestingInlineCompletionConnection = true
+        setInlineCompletionStatus(.settingsCheckingServiceHealth)
+        Task { @MainActor [weak self] in
+            defer { self?.isTestingInlineCompletionConnection = false }
+            do {
+                guard let service = self?.deepSeekService else { return }
+                _ = try await service.availableModels(apiKey: apiKey)
+                self?.setInlineCompletionStatus(.settingsServiceHealthy)
             } catch {
                 self?.setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
             }

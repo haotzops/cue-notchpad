@@ -64,6 +64,30 @@ final class CueCoreXCTests: XCTestCase {
         XCTAssertEqual(defaults.data(forKey: "cueUsageArchive.v1"), future)
     }
 
+    @MainActor
+    func testUsageClearRequiresSupportedArchiveAndPreservesItsSchema() throws {
+        let suiteName = "cue-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(try fixtureData(named: "usage-v1.json"), forKey: "cueUsageArchive.v1")
+        let usage = CueUsageStore(defaults: defaults)
+        usage.clearUsageStatistics()
+        XCTAssertTrue(usage.records.isEmpty)
+        XCTAssertEqual(usage.cueOpenCount, 0)
+        XCTAssertTrue(usage.cueOpenDates.isEmpty)
+        let cleared = try XCTUnwrap(defaults.data(forKey: "cueUsageArchive.v1"))
+        XCTAssertEqual(
+            (try JSONSerialization.jsonObject(with: cleared) as? [String: Any])?["schemaVersion"] as? Int,
+            CueUsageStore.schemaVersion
+        )
+
+        let future = Data("{\"schemaVersion\":2,\"records\":[],\"cueOpenCount\":0,\"cueOpenDates\":[],\"futureField\":true}".utf8)
+        defaults.set(future, forKey: "cueUsageArchive.v1")
+        CueUsageStore(defaults: defaults).clearUsageStatistics()
+        XCTAssertEqual(defaults.data(forKey: "cueUsageArchive.v1"), future)
+    }
+
     private func fixtureData(named name: String) throws -> Data {
         let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         return try Data(contentsOf: testsDirectory.appendingPathComponent("Fixtures/Persistence/\(name)"))

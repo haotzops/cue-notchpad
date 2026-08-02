@@ -26,6 +26,11 @@ struct CueAISettingsView: View {
                 }
                 .disabled(!settings.inlineCompletionKeyConfigured || settings.isLoadingInlineCompletionModels)
 
+                Button(settings.localized(.settingsHealthCheck)) {
+                    settings.checkDeepSeekServiceHealth()
+                }
+                .disabled(!settings.inlineCompletionKeyConfigured || settings.isTestingInlineCompletionConnection)
+
                 Button(settings.localized(.settingsRemoveAPIKey)) {
                     settings.removeDeepSeekAPIKey()
                 }
@@ -77,8 +82,8 @@ struct CueAISettingsView: View {
                             .controlSize(.small)
                     }
 
-                    Button(settings.localized(.settingsTestModel)) {
-                        settings.testDeepSeekAPIKey()
+                    Button(settings.localized(.settingsTestFIM)) {
+                        settings.testDeepSeekFIM()
                     }
                     .disabled(
                         !settings.inlineCompletionKeyConfigured
