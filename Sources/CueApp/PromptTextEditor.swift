@@ -1,24 +1,30 @@
 import AppKit
+import CueCore
 import SwiftUI
 
 /// AppKit owns an active editing transaction. SwiftUI receives only committed
 /// document changes and never uses a view refresh to overwrite NSTextView.
 struct PromptTextEditor: NSViewRepresentable {
+    static let verticalTextInset: CGFloat = 9
+
     @ObservedObject var model: PromptModel
     @ObservedObject var settings: CueSettings
     let editorFont: NSFont
+    let placeholder: String
     let overflowBehavior: CueOverflowBehavior
     let onSubmit: () -> Void
     let onCancel: () -> Void
     let onHide: () -> Void
     let onOpenSettings: () -> Void
-    let onContentHeightChange: (CGFloat) -> Void
+    let onAdjustEditorFontSize: (Double) -> Void
+    let onLayoutMetricsChange: (EditorLayoutMetrics) -> Void
     let onReady: (NSTextView) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
+        let scrollView = CueEditorScrollView()
+        scrollView.onLayoutMetricsChange = onLayoutMetricsChange
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
         scrollView.wantsLayer = true
@@ -33,6 +39,7 @@ struct PromptTextEditor: NSViewRepresentable {
         textView.onCancel = onCancel
         textView.onHide = onHide
         textView.onOpenSettings = onOpenSettings
+        textView.onAdjustEditorFontSize = onAdjustEditorFontSize
         textView.promptExpansionShortcut = settings.promptExpansionShortcut
         textView.inlineCompletionAcceptShortcut = settings.inlineCompletionAcceptShortcut
         textView.onExpandPrompt = { [weak textView, weak model, weak settings] in
@@ -51,6 +58,7 @@ struct PromptTextEditor: NSViewRepresentable {
             }
         }
         textView.string = model.text
+        textView.placeholder = placeholder
         textView.font = editorFont
         textView.textColor = .white
         textView.insertionPointColor = .white
@@ -66,7 +74,7 @@ struct PromptTextEditor: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.isAutomaticSpellingCorrectionEnabled = false
-        textView.textContainerInset = NSSize(width: 13, height: 12)
+        textView.textContainerInset = NSSize(width: 13, height: Self.verticalTextInset)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
@@ -91,7 +99,7 @@ struct PromptTextEditor: NSViewRepresentable {
 
         DispatchQueue.main.async {
             textView.setSelectedRange(NSRange(location: textView.string.utf16.count, length: 0))
-            context.coordinator.reportCommittedContentHeight(of: textView)
+            context.coordinator.reportEditorLayout(of: textView)
             onReady(textView)
         }
         return scrollView
@@ -105,17 +113,28 @@ struct PromptTextEditor: NSViewRepresentable {
         context.coordinator.inlineCompletionController.updateSettings(settings)
         (scrollView.documentView as? CueTextView)?.promptExpansionShortcut = settings.promptExpansionShortcut
         (scrollView.documentView as? CueTextView)?.inlineCompletionAcceptShortcut = settings.inlineCompletionAcceptShortcut
+        (scrollView.documentView as? CueTextView)?.placeholder = placeholder
+        (scrollView.documentView as? CueTextView)?.onAdjustEditorFontSize = onAdjustEditorFontSize
+        (scrollView as? CueEditorScrollView)?.onLayoutMetricsChange = onLayoutMetricsChange
         applyOverflowBehavior(to: scrollView)
         guard let textView = scrollView.documentView as? NSTextView else { return }
         context.coordinator.applyExternalDocumentIfNeeded(to: textView)
         applyEditorFontIfNeeded(to: textView)
-        DispatchQueue.main.async { context.coordinator.reportCommittedContentHeight(of: textView) }
+        DispatchQueue.main.async { context.coordinator.reportEditorLayout(of: textView) }
     }
 
     private func applyOverflowBehavior(to scrollView: NSScrollView) {
         let scrollable = overflowBehavior == .scrollable
         scrollView.hasVerticalScroller = scrollable
         scrollView.autohidesScrollers = scrollable
+        scrollView.verticalScrollElasticity = scrollable ? .automatic : .none
+        if let scrollView = scrollView as? CueEditorScrollView {
+            scrollView.locksVerticalScrolling = !scrollable
+        }
+        if !scrollable {
+            scrollView.contentView.scroll(to: .zero)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
     }
 
     private func applyEditorFontIfNeeded(to textView: NSTextView) {
@@ -160,7 +179,7 @@ struct PromptTextEditor: NSViewRepresentable {
             textView.string = desired
             textView.setSelectedRange(NSRange(location: desired.utf16.count, length: 0))
             installedText = desired
-            reportCommittedContentHeight(of: textView)
+            reportEditorLayout(of: textView)
         }
 
         func textDidChange(_ notification: Notification) {
@@ -185,20 +204,69 @@ struct PromptTextEditor: NSViewRepresentable {
             let committedText = textView.string
             installedText = committedText
             parent.model.acceptCommittedText(committedText)
-            reportCommittedContentHeight(of: textView)
+            reportEditorLayout(of: textView)
         }
 
         /// Selection changes deliberately do not measure layout: they happen
         /// during IME composition and do not change the required content height.
-        func reportCommittedContentHeight(of textView: NSTextView) {
+        func reportEditorLayout(of textView: NSTextView) {
             guard !textView.hasMarkedText(),
-                  let container = textView.textContainer,
-                  let manager = textView.layoutManager
+                  let scrollView = textView.enclosingScrollView as? CueEditorScrollView
             else { return }
-            manager.ensureLayout(for: container)
-            let usedHeight = manager.usedRect(for: container).height
-            let oneLine = manager.defaultLineHeight(for: textView.font ?? .systemFont(ofSize: 16))
-            parent.onContentHeightChange(ceil(max(usedHeight, oneLine) + textView.textContainerInset.height * 2))
+            scrollView.reportEditorLayoutMetrics()
+        }
+    }
+}
+
+/// In grow-with-content mode every laid-out line must remain visible. AppKit
+/// otherwise accepts wheel scrolling (including elastic scrolling) even when
+/// no scroller is shown, which makes the panel appear to be a fixed viewport.
+private final class CueEditorScrollView: NSScrollView {
+    var locksVerticalScrolling = false
+    var onLayoutMetricsChange: ((EditorLayoutMetrics) -> Void)?
+    private var lastMetrics: EditorLayoutMetrics?
+
+    override func layout() {
+        super.layout()
+        reportEditorLayoutMetrics()
+    }
+
+    /// Measures both values during one completed AppKit layout pass. The clip
+    /// view is the real editor viewport; NSTextView.visibleRect is deliberately
+    /// avoided because a vertically resizable document view can report a
+    /// different value while the scroll view is being laid out.
+    func reportEditorLayoutMetrics() {
+        guard let textView = documentView as? NSTextView,
+              let container = textView.textContainer,
+              let manager = textView.layoutManager
+        else { return }
+
+        manager.ensureLayout(for: container)
+        let usedRect = manager.usedRect(for: container)
+        var requiredTextHeight = usedRect.maxY
+        if manager.extraLineFragmentTextContainer === container {
+            requiredTextHeight = max(requiredTextHeight, manager.extraLineFragmentRect.maxY)
+        }
+        if requiredTextHeight <= 0 {
+            requiredTextHeight = manager.defaultLineHeight(for: textView.font ?? .systemFont(ofSize: 16))
+        }
+
+        let metrics = EditorLayoutMetrics(
+            viewportHeight: contentView.bounds.height,
+            requiredContentHeight: requiredTextHeight + textView.textContainerInset.height * 2
+        )
+        guard lastMetrics.map({
+            abs($0.viewportHeight - metrics.viewportHeight) < 0.5
+                && abs($0.requiredContentHeight - metrics.requiredContentHeight) < 0.5
+        }) != true else { return }
+        lastMetrics = metrics
+        onLayoutMetricsChange?(metrics)
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        guard locksVerticalScrolling, event.scrollingDeltaY != 0 else {
+            super.scrollWheel(with: event)
+            return
         }
     }
 }
@@ -215,15 +283,18 @@ final class CueTextView: NSTextView {
     var onCancel: (() -> Void)?
     var onHide: (() -> Void)?
     var onOpenSettings: (() -> Void)?
+    var onAdjustEditorFontSize: ((Double) -> Void)?
     var promptExpansionShortcut = CueShortcut.promptExpansionDefault
     var onExpandPrompt: (() -> Void)?
     var onAcceptInlineCompletion: (() -> Bool)?
     var onRequestInlineCompletion: (() -> Bool)?
     var onDismissInlineCompletion: (() -> Bool)?
     var inlineCompletion: CueInlineCompletion? { didSet { needsDisplay = true } }
+    var placeholder: String? { didSet { needsDisplay = true } }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        drawPlaceholderIfNeeded()
         guard let completion = inlineCompletion,
               let container = textContainer,
               let font = self.font,
@@ -268,6 +339,30 @@ final class CueTextView: NSTextView {
         )
     }
 
+    private func drawPlaceholderIfNeeded() {
+        guard string.isEmpty,
+              let placeholder,
+              let container = textContainer,
+              let font = self.font
+        else { return }
+
+        let storage = NSTextStorage(string: placeholder, attributes: [
+            .font: font,
+            .foregroundColor: NSColor.white.withAlphaComponent(0.26),
+        ])
+        let manager = NSLayoutManager()
+        let placeholderContainer = NSTextContainer(size: container.containerSize)
+        placeholderContainer.lineFragmentPadding = container.lineFragmentPadding
+        placeholderContainer.widthTracksTextView = container.widthTracksTextView
+        manager.addTextContainer(placeholderContainer)
+        storage.addLayoutManager(manager)
+        manager.ensureLayout(for: placeholderContainer)
+        manager.drawGlyphs(
+            forGlyphRange: manager.glyphRange(for: placeholderContainer),
+            at: NSPoint(x: textContainerInset.width + 5, y: textContainerInset.height)
+        )
+    }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard flags.contains(.command), !hasMarkedText(), let characters = event.charactersIgnoringModifiers?.lowercased() else {
@@ -295,6 +390,15 @@ final class CueTextView: NSTextView {
         let expansionShortcutMatches = event.keyCode == promptExpansionShortcut.keyCode && flags == promptExpansionShortcut.modifierFlags
         if expansionShortcutMatches, !hasMarkedText() { onExpandPrompt?(); return }
         if event.keyCode == 53, !hasMarkedText(), onDismissInlineCompletion?() == true { return }
+        let hasCommandWithOptionalShift = flags == .command || flags == [.command, .shift]
+        if hasCommandWithOptionalShift, event.keyCode == 24, !hasMarkedText() {
+            onAdjustEditorFontSize?(1)
+            return
+        }
+        if hasCommandWithOptionalShift, event.keyCode == 27, !hasMarkedText() {
+            onAdjustEditorFontSize?(-1)
+            return
+        }
         if event.keyCode == 43, flags == .command, !hasMarkedText() { onOpenSettings?(); return }
         if event.keyCode == 4, flags == .command, !hasMarkedText() { onHide?(); return }
         if isReturn, flags.contains(.command), !hasMarkedText() { onSubmit?(); return }

@@ -22,7 +22,7 @@ final class PromptWindowController: NSWindowController {
     private weak var editor: NSTextView?
     private var settingsWindowController: SettingsWindowController?
     private var settingsObservation: AnyCancellable?
-    private var contentHeightObservation: AnyCancellable?
+    private var editorLayoutObservation: AnyCancellable?
     private var layoutUpdateWorkItem: DispatchWorkItem?
     private var didFinish = false
 
@@ -202,20 +202,27 @@ final class PromptWindowController: NSWindowController {
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(16), execute: workItem)
     }
 
-    private func applySettings() {
+    private func applySettings(editorLayoutMetrics: EditorLayoutMetrics? = nil) {
         guard let panel = window else { return }
         let maximumHeight = min(CGFloat(800), targetScreen.visibleFrame.height - 8)
         let requestedHeight: CGFloat
-        if settings.overflowBehavior == .growWithContent {
-            requestedHeight = max(CGFloat(settings.normalizedHeight), presentation.model.editorContentHeight + 91)
+        if settings.overflowBehavior == .growWithContent,
+           let metrics = editorLayoutMetrics ?? presentation.model.editorLayoutMetrics {
+            // `metrics` is measured atomically by CueEditorScrollView after
+            // TextKit layout. Chrome comes from the live content view rather
+            // than duplicated PromptView constants, so user font, window size,
+            // safe-area, and future header/footer changes all remain correct.
+            let currentContentHeight = panel.contentView?.bounds.height ?? panel.frame.height
+            requestedHeight = EditorHeightPolicy.panelHeight(
+                basePanelHeight: CGFloat(settings.normalizedHeight),
+                currentPanelHeight: currentContentHeight,
+                editorViewportHeight: metrics.viewportHeight,
+                requiredEditorContentHeight: metrics.requiredContentHeight
+            )
         } else {
             requestedHeight = CGFloat(settings.normalizedHeight)
         }
         let openHeight = min(max(CGFloat(CueSettings.minimumWindowHeight), requestedHeight), maximumHeight)
-        if abs(presentation.effectiveOpenHeight - openHeight) >= 0.5 {
-            presentation.effectiveOpenHeight = openHeight
-        }
-
         let targetLayout = NotchLayout(
             screen: screenGeometry,
             preferredOpenWidth: settings.normalizedWidth,
@@ -235,9 +242,15 @@ final class PromptWindowController: NSWindowController {
             || abs(currentFrame.width - targetFrame.width) >= 0.5
             || abs(currentFrame.height - targetFrame.height) >= 0.5
         if frameChanged {
-            // Repeated AppKit frame animations were the visible jump. The
-            // coalesced final geometry is applied once with its top edge fixed.
+            // Resize the native panel before updating SwiftUI's renderer.
+            // Publishing `effectiveOpenHeight` first re-entered TextKit while
+            // the panel still had its old frame, producing a stale viewport
+            // metric and a visible grow/shrink/grow jump.
             panel.setFrame(targetFrame, display: true, animate: false)
+            panel.contentView?.layoutSubtreeIfNeeded()
+        }
+        if abs(presentation.effectiveOpenHeight - openHeight) >= 0.5 {
+            presentation.effectiveOpenHeight = openHeight
         }
         panel.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
     }
@@ -298,12 +311,22 @@ final class PromptWindowController: NSWindowController {
     }
 
     private func observeContentHeight(for model: PromptModel) {
-        contentHeightObservation = model.$editorContentHeight
+        editorLayoutObservation = model.$editorLayoutMetrics
             .removeDuplicates()
-            .sink { [weak self] _ in
-                guard self?.settings.overflowBehavior == .growWithContent else { return }
-                self?.scheduleLayoutUpdate()
+            .sink { [weak self] metrics in
+                self?.applyContentDrivenLayout(using: metrics)
             }
+    }
+
+    private func applyContentDrivenLayout(using metrics: EditorLayoutMetrics?) {
+        guard settings.overflowBehavior == .growWithContent,
+              let metrics
+        else { return }
+        // `@Published` emits before the stored property is updated. Use the
+        // event payload, which is the atomic TextKit snapshot, rather than
+        // reading the model here and accidentally resizing with the preceding
+        // layout's metrics.
+        applySettings(editorLayoutMetrics: metrics)
     }
 
     private static func geometry(for screen: NSScreen) -> NotchScreenGeometry {

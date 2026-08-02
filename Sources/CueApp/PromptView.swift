@@ -20,6 +20,11 @@ private final class TokenCountCancellation: @unchecked Sendable {
     }
 }
 
+enum PromptChromeLayout {
+    static let footerHeight: CGFloat = 34
+    static let footerBottomPadding: CGFloat = 9
+}
+
 final class PromptModel: ObservableObject {
     private static let tokenQueue = DispatchQueue(
         label: "io.github.haotzops.cue-notchpad.token-counter",
@@ -32,7 +37,10 @@ final class PromptModel: ObservableObject {
     @Published var tokenCount: Int? = 0
     @Published private(set) var fimInputTokens = 0
     @Published private(set) var fimOutputTokens = 0
-    @Published private(set) var editorContentHeight: CGFloat = 42
+    /// Published atomically from one AppKit layout pass. Keeping the viewport
+    /// and required text height together prevents panel resizing from combining
+    /// values from different TextKit/SwiftUI layout passes.
+    @Published private(set) var editorLayoutMetrics: EditorLayoutMetrics?
 
     private var tokenRequest: TokenCountCancellation?
 
@@ -58,10 +66,13 @@ final class PromptModel: ObservableObject {
         fimOutputTokens += output
     }
 
-    func updateEditorContentHeight(_ value: CGFloat) {
-        let rounded = ceil(value)
-        guard abs(editorContentHeight - rounded) >= 1 else { return }
-        editorContentHeight = rounded
+    func updateEditorLayoutMetrics(_ metrics: EditorLayoutMetrics) {
+        let rounded = EditorLayoutMetrics(
+            viewportHeight: ceil(metrics.viewportHeight),
+            requiredContentHeight: ceil(metrics.requiredContentHeight)
+        )
+        guard editorLayoutMetrics != rounded else { return }
+        editorLayoutMetrics = rounded
     }
 
     private func scheduleTokenCount() {
@@ -238,7 +249,7 @@ struct PromptView: View {
                 Spacer()
 
                 Text(localized(.promptLabel))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
                     .tracking(1.4)
                     .foregroundStyle(.white.opacity(0.45))
             }
@@ -253,7 +264,6 @@ struct PromptView: View {
             .clipped()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 27)
-            .padding(.top, 6)
 
             HStack(spacing: 7) {
                 Text(characterCount)
@@ -305,12 +315,13 @@ struct PromptView: View {
                 keycap("↩")
                     .padding(.leading, -4)
                 Text(localized(.actionDone))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.56))
             }
             .font(.system(size: 10, weight: .medium))
-            .frame(height: 34)
+            .frame(height: PromptChromeLayout.footerHeight)
             .padding(.horizontal, chromeHorizontalInset)
-            .padding(.bottom, 9)
+            .padding(.bottom, PromptChromeLayout.footerBottomPadding)
         }
     }
 
@@ -347,7 +358,7 @@ struct PromptView: View {
             onCancel: onCancel,
             onHide: onHide,
             onOpenSettings: onOpenSettings,
-            onContentHeightChange: { presentation.model.updateEditorContentHeight($0) },
+            onLayoutMetricsChange: presentation.model.updateEditorLayoutMetrics,
             onEditorReady: onEditorReady
         )
     }
@@ -372,7 +383,7 @@ struct PromptView: View {
             .font(.system(size: 9, weight: .semibold, design: .rounded))
             .foregroundStyle(.white.opacity(0.62))
             .padding(.horizontal, 5)
-            .frame(minWidth: 20, minHeight: 18)
+            .frame(minWidth: 22, minHeight: 22)
             .background(Color.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 5))
             .overlay {
                 RoundedRectangle(cornerRadius: 5)
@@ -389,32 +400,23 @@ private struct SessionEditor: View {
     let onCancel: () -> Void
     let onHide: () -> Void
     let onOpenSettings: () -> Void
-    let onContentHeightChange: (CGFloat) -> Void
+    let onLayoutMetricsChange: (EditorLayoutMetrics) -> Void
     let onEditorReady: (NSTextView) -> Void
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            PromptTextEditor(
-                model: model,
-                settings: settings,
-                editorFont: settings.editorFont,
-                overflowBehavior: settings.overflowBehavior,
-                onSubmit: onSubmit,
-                onCancel: onCancel,
-                onHide: onHide,
-                onOpenSettings: onOpenSettings,
-                onContentHeightChange: onContentHeightChange,
-                onReady: onEditorReady
-            )
-
-            if model.text.isEmpty {
-                Text(placeholder)
-                    .font(Font(settings.editorFont))
-                    .foregroundStyle(.white.opacity(0.26))
-                    .padding(.leading, 21)
-                    .padding(.top, 13)
-                    .allowsHitTesting(false)
-            }
-        }
+        PromptTextEditor(
+            model: model,
+            settings: settings,
+            editorFont: settings.editorFont,
+            placeholder: placeholder,
+            overflowBehavior: settings.overflowBehavior,
+            onSubmit: onSubmit,
+            onCancel: onCancel,
+            onHide: onHide,
+            onOpenSettings: onOpenSettings,
+            onAdjustEditorFontSize: settings.adjustEditorFontSize,
+            onLayoutMetricsChange: onLayoutMetricsChange,
+            onReady: onEditorReady
+        )
     }
 }

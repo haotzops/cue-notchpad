@@ -107,6 +107,34 @@ let minimumHeightLayout = NotchLayout(
 expect(minimumHeightLayout.openSize.height == 130, "minimum height")
 
 expect(
+    EditorHeightPolicy.panelHeight(
+        basePanelHeight: 150,
+        currentPanelHeight: 150,
+        editorViewportHeight: 75,
+        requiredEditorContentHeight: 72
+    ) == 150,
+    "editor height policy retains the user-selected base height"
+)
+expect(
+    EditorHeightPolicy.panelHeight(
+        basePanelHeight: 150,
+        currentPanelHeight: 150,
+        editorViewportHeight: 75,
+        requiredEditorContentHeight: 90
+    ) == 165,
+    "editor height policy grows from a measured 3.2-line viewport to four lines"
+)
+expect(
+    EditorHeightPolicy.panelHeight(
+        basePanelHeight: 150,
+        currentPanelHeight: 165,
+        editorViewportHeight: 90,
+        requiredEditorContentHeight: 108
+    ) == 183,
+    "editor height policy keeps chrome stable after a prior growth"
+)
+
+expect(
     CueLocalization.string(.promptPlaceholder,  localization: "en")
         == "Write a prompt…",
     "English prompt localization"
