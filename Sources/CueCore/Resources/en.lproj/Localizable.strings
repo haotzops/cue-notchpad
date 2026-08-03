@@ -22,10 +22,15 @@
 "settings.choose_font" = "Choose…";
 "settings.restore_default_font" = "Restore default editor font";
 "settings.restore_default_window_size" = "Restore default window size";
+"settings.reset_and_data" = "Reset & Data";
 "settings.restore_all" = "Restore All Settings";
+"settings.restore_all.detail" = "Restore window, editor, AI, and shortcut preferences. Your API key and usage history are retained.";
 "settings.restore_all.confirmation" = "This restores all application settings but does not delete your API key or usage statistics.";
+"settings.restore" = "Restore";
 "settings.clear_usage" = "Clear Usage Statistics";
+"settings.clear_usage.detail" = "Permanently delete local usage records. Your settings and API key are retained.";
 "settings.clear_usage.confirmation" = "This permanently deletes all local usage statistics and cannot be undone.";
+"settings.clear" = "Clear";
 "settings.cancel" = "Cancel";
 "settings.chinese_english_spacing" = "Add spaces between Chinese and English when submitting";
 "settings.chinese_english_spacing.hint" = "Apply spacing when the prompt is submitted.";

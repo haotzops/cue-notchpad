@@ -22,10 +22,15 @@
 "settings.choose_font" = "选择…";
 "settings.restore_default_font" = "恢复默认编辑器字体";
 "settings.restore_default_window_size" = "恢复默认窗口大小";
+"settings.reset_and_data" = "重置与数据";
 "settings.restore_all" = "还原所有设置";
+"settings.restore_all.detail" = "还原窗口、编辑器、AI 和快捷键偏好；保留 API Key 与使用历史。";
 "settings.restore_all.confirmation" = "这会还原所有应用设置，但不会删除 API Key 或使用统计。";
+"settings.restore" = "还原";
 "settings.clear_usage" = "清除使用统计";
+"settings.clear_usage.detail" = "永久删除本地使用记录；保留设置与 API Key。";
 "settings.clear_usage.confirmation" = "这会永久删除所有本地使用统计，且无法撤销。";
+"settings.clear" = "清除";
 "settings.cancel" = "取消";
 "settings.chinese_english_spacing" = "提交时自动在中英文之间加空格";
 "settings.chinese_english_spacing.hint" = "在提交 prompt 时应用。";

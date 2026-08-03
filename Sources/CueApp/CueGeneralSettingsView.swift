@@ -47,7 +47,7 @@ struct CueGeneralSettingsView: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
 
-        Section {
+        Section(settings.localized(.settingsResetAndData)) {
             settingsActions
         }
     }
@@ -64,7 +64,7 @@ struct CueGeneralSettingsView: View {
         Group {
             LabeledContent(settings.localized(.settingsEditorFont)) {
                 HStack(spacing: 8) {
-                    Text("\(editorFontDisplayName) · \(settings.editorFont.pointSize.formatted()) \(settings.localized(.unitPoints))")
+                    Text(editorFontDisplayName)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .help(settings.editorFont.fontName)
@@ -117,36 +117,60 @@ struct CueGeneralSettingsView: View {
     }
 
     private var settingsActions: some View {
-        HStack {
-            Button(settings.localized(.settingsRestoreAll)) {
-                isConfirmingRestoreAll = true
-            }
-            .confirmationDialog(
-                settings.localized(.settingsRestoreAllConfirmation),
-                isPresented: $isConfirmingRestoreAll,
-                titleVisibility: .visible
-            ) {
-                Button(settings.localized(.settingsRestoreAll), role: .destructive) {
-                    settings.restoreAllSettings()
+        VStack(spacing: 10) {
+            LabeledContent {
+                Button(settings.localized(.settingsRestore)) {
+                    isConfirmingRestoreAll = true
                 }
-                Button(settings.localized(.settingsCancel), role: .cancel) {}
+                .confirmationDialog(
+                    settings.localized(.settingsRestoreAllConfirmation),
+                    isPresented: $isConfirmingRestoreAll,
+                    titleVisibility: .visible
+                ) {
+                    Button(settings.localized(.settingsRestoreAll), role: .destructive) {
+                        settings.restoreAllSettings()
+                    }
+                    Button(settings.localized(.settingsCancel), role: .cancel) {}
+                }
+            } label: {
+                actionDescription(
+                    title: settings.localized(.settingsRestoreAll),
+                    detail: settings.localized(.settingsRestoreAllDetail)
+                )
             }
 
-            Spacer()
+            Divider()
 
-            Button(settings.localized(.settingsClearUsage)) {
-                isConfirmingUsageClear = true
-            }
-            .confirmationDialog(
-                settings.localized(.settingsClearUsageConfirmation),
-                isPresented: $isConfirmingUsageClear,
-                titleVisibility: .visible
-            ) {
-                Button(settings.localized(.settingsClearUsage), role: .destructive) {
-                    CueUsageStore.shared.clearUsageStatistics()
+            LabeledContent {
+                Button(settings.localized(.settingsClear)) {
+                    isConfirmingUsageClear = true
                 }
-                Button(settings.localized(.settingsCancel), role: .cancel) {}
+                .tint(.red)
+                .confirmationDialog(
+                    settings.localized(.settingsClearUsageConfirmation),
+                    isPresented: $isConfirmingUsageClear,
+                    titleVisibility: .visible
+                ) {
+                    Button(settings.localized(.settingsClearUsage), role: .destructive) {
+                        CueUsageStore.shared.clearUsageStatistics()
+                    }
+                    Button(settings.localized(.settingsCancel), role: .cancel) {}
+                }
+            } label: {
+                actionDescription(
+                    title: settings.localized(.settingsClearUsage),
+                    detail: settings.localized(.settingsClearUsageDetail)
+                )
             }
+        }
+    }
+
+    private func actionDescription(title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+            Text(detail)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
