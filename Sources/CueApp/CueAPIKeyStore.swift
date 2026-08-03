@@ -4,9 +4,15 @@ import Foundation
 /// The file is deliberately restricted to the current user (0600); it is not Keychain-backed.
 enum CueAPIKeyStoreError: LocalizedError {
     case unsupportedSchema
+    case corruptConfiguration
 
     var errorDescription: String? {
-        "This configuration was created by a newer version of Cue."
+        switch self {
+        case .unsupportedSchema:
+            "This configuration was created by a newer version of Cue."
+        case .corruptConfiguration:
+            "The Cue configuration is corrupt and was left unchanged."
+        }
     }
 }
 
@@ -34,7 +40,12 @@ enum CueAPIKeyStore {
 
         // Preserve additive fields in supported documents. Future schemas are
         // read-only so this release can never overwrite unknown data.
-        var document = (try? configuration(at: fileURL)) ?? [:]
+        var document: [String: Any]
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            document = try configuration(at: fileURL)
+        } else {
+            document = [:]
+        }
         let storedVersion = document["schemaVersion"] as? Int ?? 0
         guard storedVersion <= currentSchemaVersion else {
             throw CueAPIKeyStoreError.unsupportedSchema
@@ -63,7 +74,7 @@ enum CueAPIKeyStore {
     private static func configuration(at url: URL) throws -> [String: Any] {
         let object = try JSONSerialization.jsonObject(with: Data(contentsOf: url))
         guard let document = object as? [String: Any] else {
-            throw CocoaError(.fileReadCorruptFile)
+            throw CueAPIKeyStoreError.corruptConfiguration
         }
         return document
     }

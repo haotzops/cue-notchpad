@@ -5,7 +5,7 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [未发布]
+## [0.3.0] - 2026-08-03
 
 ### 新增
 
@@ -52,6 +52,6 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 - 使用本地 `cl100k_base` 词表计算 token，不发送网络请求。
 - 添加 Cue Notchpad 应用图标。
 
-[未发布]: https://github.com/haotzops/cue-notchpad/compare/v0.2.0...HEAD
+[0.3.0]: https://github.com/haotzops/cue-notchpad/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/haotzops/cue-notchpad/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/haotzops/cue-notchpad/releases/tag/v0.1.0

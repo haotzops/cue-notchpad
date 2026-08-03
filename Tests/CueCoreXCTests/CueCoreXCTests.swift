@@ -42,6 +42,11 @@ final class CueCoreXCTests: XCTestCase {
         try futureData.write(to: url)
         XCTAssertThrowsError(try CueAPIKeyStore.saveDeepSeekAPIKey("new-key"))
         XCTAssertEqual(try Data(contentsOf: url), futureData)
+
+        let corruptData = try fixtureData(named: "config-corrupt.json")
+        try corruptData.write(to: url)
+        XCTAssertThrowsError(try CueAPIKeyStore.saveDeepSeekAPIKey("must-not-replace-corrupt"))
+        XCTAssertEqual(try Data(contentsOf: url), corruptData)
     }
 
     @MainActor

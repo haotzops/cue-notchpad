@@ -57,7 +57,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          RELEASE_VERSION=0.1.0 BUILD_NUMBER="$GITHUB_RUN_NUMBER" make app
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Supporting/Info.plist)"
+          RELEASE_VERSION="$version" BUILD_NUMBER="$GITHUB_RUN_NUMBER" make app
           app="build/Cue Notchpad.app"
           plutil -lint "$app/Contents/Info.plist"
           codesign --verify --deep --strict --verbose=2 "$app"
@@ -65,7 +66,7 @@ jobs:
           test -f "$app/Contents/Resources/ThirdPartyNotices.txt"
           test -f "$app/Contents/Resources/LICENSE.txt"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = "io.github.haotzops.cue-notchpad"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "0.1.0"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = "$GITHUB_RUN_NUMBER"
           xcrun lipo -archs "$app/Contents/MacOS/cue" | grep -qw "$(uname -m)"
           xcrun lipo -archs "$app/Contents/MacOS/cue-host" | grep -qw "$(uname -m)"
@@ -79,8 +80,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          RELEASE_VERSION=0.1.0 BUILD_NUMBER="$GITHUB_RUN_NUMBER" make release
-          archive="dist/Cue-Notchpad-0.1.0-macOS-universal.zip"
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Supporting/Info.plist)"
+          RELEASE_VERSION="$version" BUILD_NUMBER="$GITHUB_RUN_NUMBER" make release
+          archive="dist/Cue-Notchpad-$version-macOS-universal.zip"
           test -f "$archive"
           (cd dist && shasum -a 256 -c SHA256SUMS)
           rm -rf /tmp/cue-release-check
