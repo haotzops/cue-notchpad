@@ -13,6 +13,7 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 - Release 归档改为 `macOS-arm64.zip`，并附带可追溯构建 metadata；CI 与发布文档同步更新。
 - Release 改为单次构建后先上传 Draft、校验 GitHub asset digest 再发布，并使用最终 digest 自动创建 Homebrew Tap 更新 PR。
 - 新增下载、校验并安装指定公开 Release 的入口，用于资产级 issue 复现。
+- Actions 固定到完整 commit SHA，并由 Dependabot 提供受审查的更新；新增正式版问题报告表单。
 
 ## [0.3.0] - 2026-08-03
 

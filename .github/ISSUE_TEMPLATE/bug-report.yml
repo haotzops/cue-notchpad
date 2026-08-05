@@ -1,0 +1,73 @@
+name: 正式版问题报告
+description: 报告 GitHub Release 或 Homebrew 安装版本的问题
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先确认问题来自正式版。开发者会优先使用相同 Release ZIP 复现；请提供 BuildInfo 或 PROVENANCE，而不要提供 API Key、prompt 正文或其他敏感内容。
+  - type: dropdown
+    id: installation-source
+    attributes:
+      label: 安装来源
+      options:
+        - GitHub Release ZIP
+        - Homebrew Cask
+        - 源码构建
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: 例如 0.3.1。
+      placeholder: 0.3.1
+    validations:
+      required: true
+  - type: input
+    id: build-number
+    attributes:
+      label: Build number
+      description: 见 app 的 Contents/Resources/BuildInfo.json。
+      placeholder: "123"
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: BuildInfo 或 PROVENANCE
+      description: 粘贴 Contents/Resources/BuildInfo.json 或 Release 的 PROVENANCE.json。请删除任何意外包含的敏感信息。
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: macOS 版本、芯片架构，以及是否运行过其他 Cue 实例。
+      placeholder: macOS 15.0，Apple Silicon
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 最小复现步骤
+      description: 请提供从启动 Cue 到问题发生的完整步骤，并说明预期和实际结果。
+    validations:
+      required: true
+  - type: dropdown
+    id: published-asset-reproduction
+    attributes:
+      label: 是否已用相同正式资产复现
+      description: 开发者可运行 make install-published-release VERSION=x.y.z；普通用户无需安装开发环境。
+      options:
+        - 是，使用相同 Release ZIP 可以复现
+        - 否，使用相同 Release ZIP 无法复现
+        - 未尝试
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 错误信息或截图
+      description: 请移除 API Key、prompt 内容、文件路径和其他敏感信息。

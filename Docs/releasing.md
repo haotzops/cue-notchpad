@@ -18,8 +18,8 @@ TAG="v$VERSION"
 - 更新 `CHANGELOG.md`，写入版本号、实际发布日期和最终变更。
 - 创建或更新 `Docs/releases/$TAG.md`，作为面向用户的 GitHub Release 正文。
 - 确认 README 中的安装命令、系统要求和未公证提示仍然准确。
-- 在仓库设置中启用 immutable releases。
 - 配置 Actions secret `HOMEBREW_TAP_TOKEN`；该 fine-grained token 必须能够读取和写入 `haotzops/homebrew-tap` 的 Contents 与 Pull requests。
+- GitHub Actions 必须使用完整 commit SHA 固定；由 `.github/dependabot.yml` 创建更新 PR，审核后再合并。
 
 `Packaging/homebrew/cue-notchpad.rb.template` 只保存 `@VERSION@` 和 `@SHA256@` 占位符。发布前不得填入本地构建的校验值；Homebrew Cask 必须由工作流使用 GitHub 最终接收的 Release asset digest 生成。
 
@@ -117,7 +117,14 @@ gh release download "$TAG" --dir "/tmp/cue-notchpad-$VERSION"
 gh release view "$TAG" --json isImmutable,assets
 ```
 
-确认 `isImmutable` 为 `true`，并检查 Release 标题、正文、ZIP、`SHA256SUMS`、`PROVENANCE.json` 与下载链接。用户 issue 应附带版本、build number 和 `BuildInfo.json` / `PROVENANCE.json`；开发者可运行 `make install-published-release VERSION="$VERSION"` 安装同一 ZIP 精确复现。
+确认 `isImmutable` 为 `true`，并检查 Release 标题、正文、ZIP、`SHA256SUMS`、`PROVENANCE.json` 与下载链接。使用新浏览器会话或干净用户目录执行一次公开安装：
+
+```bash
+make install-published-release VERSION="$VERSION"
+cue --invalid-option  # 预期退出码 64
+```
+
+用户应使用仓库的正式版问题表单，附上版本、build number 和 `BuildInfo.json` / `PROVENANCE.json`；开发者收到问题后先按相同命令安装同一 ZIP 精确复现。
 
 ## 5. 合并 Homebrew Tap PR
 
@@ -147,5 +154,5 @@ ruby -c /tmp/cue-notchpad.rb
 - 不要使用 `gh release upload --clobber`，也不要替换已有版本的 ZIP；已公开版本的修复使用新的补丁版本。
 - 不要为版本化 Release asset 使用 `sha256 :no_check`。
 - Tap PR 未通过时修复 Cask 生成或 Tap 测试，不得重建或替换已经发布的 ZIP。
-- Developer ID 签名或 Apple 公证策略发生变化时，同步更新 README、Release 说明和 Cask caveats。
+- 当前发行使用 ad-hoc 签名；Developer ID 签名或 Apple 公证策略发生变化时，同步更新 README、Release 说明和 Cask caveats。
 - 发布完成后检查 GitHub Release 和 Homebrew 两种安装方式，确保 README 中的命令仍然可用。

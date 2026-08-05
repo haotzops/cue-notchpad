@@ -51,6 +51,14 @@ brew uninstall --cask cue-notchpad
 xattr -dr com.apple.quarantine "$HOME/Applications/Cue Notchpad.app"
 ```
 
+## 报告正式版问题
+
+请使用 [正式版问题报告](https://github.com/haotzops/cue-notchpad/issues/new?template=bug-report.yml)，附上版本、build number 和 `BuildInfo.json` 或 `PROVENANCE.json`。这些 metadata 不包含用户设置、API Key 或 prompt 内容。开发者会先用相同正式资产复现：
+
+```bash
+make install-published-release VERSION=x.y.z
+```
+
 ## 使用
 
 ```bash
