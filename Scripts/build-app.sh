@@ -2,16 +2,25 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CONFIGURATION="${CONFIGURATION:-release}"
+CONFIGURATION="${CONFIGURATION:-debug}"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT/build}"
 APP="$OUTPUT_DIR/Cue Notchpad.app"
 INFO_PLIST="$ROOT/Supporting/Info.plist"
 PLIST_BUDDY="/usr/libexec/PlistBuddy"
 RELEASE_VERSION="${RELEASE_VERSION:-$($PLIST_BUDDY -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")}"
 BUILD_NUMBER="${BUILD_NUMBER:-$($PLIST_BUDDY -c 'Print :CFBundleVersion' "$INFO_PLIST")}"
-ARCHS="${ARCHS:-}"
+ARCHS="${ARCHS:-arm64}"
 MINIMUM_MACOS_VERSION="${MINIMUM_MACOS_VERSION:-13.0}"
+SOURCE_REVISION="${SOURCE_REVISION:-$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || printf 'unknown')}"
+SOURCE_DIRTY=false
+if [[ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no 2>/dev/null || true)" ]]; then
+    SOURCE_DIRTY=true
+fi
 
+[[ "$CONFIGURATION" == "debug" || "$CONFIGURATION" == "release" ]] || {
+    printf 'Unsupported CONFIGURATION: %s\n' "$CONFIGURATION" >&2
+    exit 2
+}
 [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || {
     printf 'Invalid RELEASE_VERSION: %s\n' "$RELEASE_VERSION" >&2
     exit 2
@@ -72,6 +81,36 @@ cp "$INFO_PLIST" "$APP/Contents/Info.plist"
 "$ROOT/Scripts/generate-app-icon.sh" "$ROOT/Supporting/logo.svg" "$APP/Contents/Resources/cue-logo.icns"
 cp "$ROOT/Supporting/ThirdPartyNotices.txt" "$APP/Contents/Resources/"
 [[ ! -f "$ROOT/LICENSE" ]] || cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
+
+export ARCHS BUILD_NUMBER CONFIGURATION MINIMUM_MACOS_VERSION RELEASE_VERSION SOURCE_DIRTY SOURCE_REVISION
+python3 - "$APP/Contents/Resources/BuildInfo.json" <<'PY'
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+
+def command_output(*command):
+    try:
+        return subprocess.check_output(command, text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+metadata = {
+    "schemaVersion": 1,
+    "version": os.environ["RELEASE_VERSION"],
+    "buildNumber": int(os.environ["BUILD_NUMBER"]),
+    "configuration": os.environ["CONFIGURATION"],
+    "architectures": os.environ["ARCHS"].split(),
+    "minimumMacOSVersion": os.environ["MINIMUM_MACOS_VERSION"],
+    "sourceRevision": os.environ["SOURCE_REVISION"],
+    "sourceDirty": os.environ["SOURCE_DIRTY"] == "true",
+    "swiftVersion": command_output("swift", "--version"),
+    "xcodeVersion": command_output("xcodebuild", "-version"),
+}
+Path(sys.argv[1]).write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
+PY
 
 # SwiftPM compiles target resources into sibling bundles. Flatten their
 # localized folders into the conventional app-bundle Resources directory so

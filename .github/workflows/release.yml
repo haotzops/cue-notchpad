@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
 
+env:
+  HOMEBREW_TAP: haotzops/tap
+  HOMEBREW_TAP_REPOSITORY: haotzops/homebrew-tap
+
 jobs:
   build:
     runs-on: macos-15
@@ -37,29 +41,125 @@ jobs:
           [[ "$plist_version" == "$RELEASE_VERSION" ]]
           [[ -f "Docs/releases/v$RELEASE_VERSION.md" ]]
 
+      - name: Verify Homebrew Tap access
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        shell: bash
+        run: |
+          [[ -n "$GH_TOKEN" ]] || {
+            echo 'HOMEBREW_TAP_TOKEN is required for tag releases.' >&2
+            exit 1
+          }
+          [[ "$(gh api "repos/$HOMEBREW_TAP_REPOSITORY" --jq '.permissions.push')" == "true" ]]
+
       - name: Test
         run: make test
 
-      - name: Build release assets
+      - name: Build release assets once
         run: RELEASE_VERSION="$RELEASE_VERSION" BUILD_NUMBER="$GITHUB_RUN_NUMBER" ./Scripts/build-release.sh
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Cue-Notchpad-${{ env.RELEASE_VERSION }}-macOS-universal
+          name: Cue-Notchpad-${{ env.RELEASE_VERSION }}-macOS-arm64
           path: |
             dist/*.zip
             dist/SHA256SUMS
+            dist/PROVENANCE.json
           if-no-files-found: error
 
-      - name: Publish GitHub Release
+      - name: Create and verify draft release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          set -euo pipefail
+          archive_name="Cue-Notchpad-$RELEASE_VERSION-macOS-arm64.zip"
+          archive="dist/$archive_name"
+          local_sha256="$(shasum -a 256 "$archive" | awk '{print $1}')"
+
           gh release create "$GITHUB_REF_NAME" \
-            dist/*.zip dist/SHA256SUMS \
+            "$archive" dist/SHA256SUMS dist/PROVENANCE.json \
+            --draft \
             --title "Cue Notchpad $GITHUB_REF_NAME" \
             --notes-file "Docs/releases/$GITHUB_REF_NAME.md" \
             --verify-tag
+
+          release_id="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\" and .draft == true) | .id")"
+          [[ "$release_id" =~ ^[0-9]+$ ]] || {
+            echo "Unable to identify the draft release for $GITHUB_REF_NAME." >&2
+            exit 1
+          }
+          github_digest="$(gh api "repos/$GITHUB_REPOSITORY/releases/$release_id/assets" \
+            --jq ".[] | select(.name == \"$archive_name\") | .digest")"
+          [[ "$github_digest" == "sha256:$local_sha256" ]] || {
+            printf 'Release asset digest mismatch: local=sha256:%s GitHub=%s\n' \
+              "$local_sha256" "$github_digest" >&2
+            exit 1
+          }
+
+          echo "RELEASE_SHA256=$local_sha256" >> "$GITHUB_ENV"
+
+      - name: Publish immutable release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+          [[ "$(gh release view "$GITHUB_REF_NAME" --json isImmutable --jq '.isImmutable')" == "true" ]] || {
+            echo 'The release was published, but immutable releases are not enabled for this repository.' >&2
+            exit 1
+          }
+
+      - name: Validate Homebrew Cask against the published asset
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap "$HOMEBREW_TAP"
+          tap_dir="$(brew --repository "$HOMEBREW_TAP")"
+          branch="cue-notchpad-v$RELEASE_VERSION-$GITHUB_RUN_ID"
+          git -C "$tap_dir" fetch origin main
+          git -C "$tap_dir" checkout -B "$branch" origin/main
+
+          ./Scripts/render-homebrew-cask.sh \
+            "$RELEASE_VERSION" "$RELEASE_SHA256" "$tap_dir/Casks/cue-notchpad.rb"
+          ruby -c "$tap_dir/Casks/cue-notchpad.rb"
+          git -C "$tap_dir" diff --check
+          brew audit --cask --strict "$HOMEBREW_TAP/cue-notchpad"
+          brew install --cask "$HOMEBREW_TAP/cue-notchpad"
+          cue_command="$(brew --prefix)/bin/cue"
+          [[ -x "$cue_command" ]]
+          set +e
+          "$cue_command" --invalid-option >/dev/null 2>&1
+          status=$?
+          set -e
+          [[ "$status" -eq 64 ]]
+          brew uninstall --cask "$HOMEBREW_TAP/cue-notchpad"
+
+          echo "HOMEBREW_TAP_DIR=$tap_dir" >> "$GITHUB_ENV"
+          echo "HOMEBREW_TAP_BRANCH=$branch" >> "$GITHUB_ENV"
+
+      - name: Open Homebrew Tap pull request
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C "$HOMEBREW_TAP_DIR" config user.name github-actions[bot]
+          git -C "$HOMEBREW_TAP_DIR" config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C "$HOMEBREW_TAP_DIR" add Casks/cue-notchpad.rb
+          git -C "$HOMEBREW_TAP_DIR" commit -m "chore(cask): 更新 Cue Notchpad v$RELEASE_VERSION"
+          gh auth setup-git
+          git -C "$HOMEBREW_TAP_DIR" push --set-upstream origin "$HOMEBREW_TAP_BRANCH"
+          gh pr create \
+            --repo "$HOMEBREW_TAP_REPOSITORY" \
+            --base main \
+            --head "$HOMEBREW_TAP_BRANCH" \
+            --title "chore(cask): 更新 Cue Notchpad v$RELEASE_VERSION" \
+            --body "使用已发布且通过 digest 校验的 Cue Notchpad v$RELEASE_VERSION arm64 资产更新 Cask。"

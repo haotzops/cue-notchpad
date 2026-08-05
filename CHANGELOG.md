@@ -5,6 +5,15 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.3.1] - 2026-08-04
+
+### 变更
+
+- 发布构建统一为 arm64；开发构建、Release 预检与正式发布拆分为明确的 Make 入口。
+- Release 归档改为 `macOS-arm64.zip`，并附带可追溯构建 metadata；CI 与发布文档同步更新。
+- Release 改为单次构建后先上传 Draft、校验 GitHub asset digest 再发布，并使用最终 digest 自动创建 Homebrew Tap 更新 PR。
+- 新增下载、校验并安装指定公开 Release 的入口，用于资产级 issue 复现。
+
 ## [0.3.0] - 2026-08-03
 
 ### 新增
@@ -52,6 +61,7 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 - 使用本地 `cl100k_base` 词表计算 token，不发送网络请求。
 - 添加 Cue Notchpad 应用图标。
 
+[0.3.1]: https://github.com/haotzops/cue-notchpad/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/haotzops/cue-notchpad/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/haotzops/cue-notchpad/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/haotzops/cue-notchpad/releases/tag/v0.1.0

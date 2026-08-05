@@ -4,26 +4,24 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${RELEASE_VERSION:-${1:-}}"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
-ARCHS="${ARCHS:-arm64 x86_64}"
+ARCHS="${ARCHS:-arm64}"
 DIST_DIR="${DIST_DIR:-$ROOT/dist}"
 STAGING_DIR="$DIST_DIR/.staging"
 APP_NAME="Cue Notchpad.app"
-ARCHIVE_NAME="Cue-Notchpad-${VERSION}-macOS-universal.zip"
+ARCHIVE_NAME="Cue-Notchpad-${VERSION}-macOS-arm64.zip"
 
 if [[ -z "$VERSION" ]]; then
     printf 'Usage: RELEASE_VERSION=0.1.0 BUILD_NUMBER=1 %s\n' "$0" >&2
     exit 2
 fi
-for required_arch in arm64 x86_64; do
-    [[ " $ARCHS " == *" $required_arch "* ]] || {
-        printf 'Release archives must include arm64 and x86_64 (ARCHS=%s)\n' "$ARCHS" >&2
-        exit 2
-    }
-done
+[[ "$ARCHS" == "arm64" ]] || {
+    printf 'Release archives support arm64 only (ARCHS=%s)\n' "$ARCHS" >&2
+    exit 2
+}
 
 rm -rf "$STAGING_DIR"
 mkdir -p "$STAGING_DIR" "$DIST_DIR"
-rm -f "$DIST_DIR"/*.zip "$DIST_DIR/SHA256SUMS"
+rm -f "$DIST_DIR"/*.zip "$DIST_DIR/SHA256SUMS" "$DIST_DIR/PROVENANCE.json"
 
 RELEASE_VERSION="$VERSION" \
 BUILD_NUMBER="$BUILD_NUMBER" \
@@ -31,6 +29,8 @@ ARCHS="$ARCHS" \
 OUTPUT_DIR="$STAGING_DIR" \
 CONFIGURATION=release \
     "$ROOT/Scripts/build-app.sh"
+
+cp "$STAGING_DIR/$APP_NAME/Contents/Resources/BuildInfo.json" "$DIST_DIR/PROVENANCE.json"
 
 for executable in cue cue-host; do
     binary="$STAGING_DIR/$APP_NAME/Contents/MacOS/$executable"
@@ -51,5 +51,5 @@ done
 )
 rm -rf "$STAGING_DIR"
 
-printf 'Prepared release assets:\n  %s\n  %s\n' \
-    "$DIST_DIR/$ARCHIVE_NAME" "$DIST_DIR/SHA256SUMS"
+printf 'Prepared release assets:\n  %s\n  %s\n  %s\n' \
+    "$DIST_DIR/$ARCHIVE_NAME" "$DIST_DIR/SHA256SUMS" "$DIST_DIR/PROVENANCE.json"

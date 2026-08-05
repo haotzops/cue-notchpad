@@ -25,7 +25,7 @@ brew uninstall --cask cue-notchpad
 
 ### GitHub Release
 
-1. 从 [GitHub Releases](https://github.com/haotzops/cue-notchpad/releases) 下载 `Cue-Notchpad-<版本>-macOS-universal.zip` 和 `SHA256SUMS`。
+1. 从 [GitHub Releases](https://github.com/haotzops/cue-notchpad/releases) 下载 `Cue-Notchpad-<版本>-macOS-arm64.zip`、`SHA256SUMS` 和 `PROVENANCE.json`。
 2. 在两个文件所在的目录校验下载内容：
 
    ```bash
@@ -90,28 +90,28 @@ make app
 open "build/Cue Notchpad.app"
 ```
 
-`make app` 默认构建当前 Mac 的原生架构，app bundle 会生成到 `build/Cue Notchpad.app`。
+`make build`、`make app` 与 `make install` 是 debug 开发入口；`make build-release`、`make app-release` 与 `make install-app-release` 显式生成本地 Release 候选。两类 app 均默认构建 arm64 并输出到 `build/Cue Notchpad.app`。正式 Release 只能由 tag workflow 构建和发布。
 构建脚本支持以下环境变量：
 
 - `RELEASE_VERSION`：写入 `CFBundleShortVersionString`，默认读取 `Supporting/Info.plist`。
 - `BUILD_NUMBER`：写入 `CFBundleVersion`，必须是正整数，默认读取 `Supporting/Info.plist`。
-- `ARCHS`：用空格分隔的目标架构；不设置时只构建当前架构。
-- `CONFIGURATION`：`debug` 或 `release`，默认 `release`。
+- `ARCHS`：目标架构；默认是 `arm64`。Release 固定只构建 `arm64`。
+- `CONFIGURATION`：`debug` 或 `release`，默认 `debug`；Release 打包脚本始终使用 `release`。
 - `OUTPUT_DIR`：app bundle 输出目录，默认 `build`。
 
-例如，构建版本号为 `0.1.0`、构建号为 `7` 的 Universal app：
+构建版本号为 `0.1.0`、构建号为 `7` 的本地 Release 候选：
 
 ```bash
-RELEASE_VERSION=0.1.0 BUILD_NUMBER=7 ARCHS="arm64 x86_64" make app
+RELEASE_VERSION=0.1.0 BUILD_NUMBER=7 ARCHS=arm64 make app-release
 ```
 
-准备可上传的 ZIP 和 SHA-256 文件，但不进行上传或发布：
+准备本地 Release 预检 ZIP、SHA-256 与 provenance，但不进行上传或发布：
 
 ```bash
 RELEASE_VERSION=0.1.0 BUILD_NUMBER=1 make release
 ```
 
-产物位于 `dist/`。完整发布检查清单见 [`Docs/releasing.md`](Docs/releasing.md)。
+产物位于 `dist/`。正式发布工作流只构建一次 ZIP，校验 GitHub asset digest 后发布 immutable release，并使用同一 digest 创建 Homebrew Tap 更新 PR。完整发布检查清单见 [`Docs/releasing.md`](Docs/releasing.md)。
 
 ## 从源码安装
 
@@ -146,6 +146,21 @@ make uninstall
 ```bash
 APP_DIR=/Applications BIN_DIR=/usr/local/bin make uninstall
 ```
+
+如果需要安装与 GitHub Release、Homebrew 完全相同的二进制，不要重新本机构建，直接安装 Release ZIP：
+
+```bash
+make install-release \
+  RELEASE_ARCHIVE=/path/to/Cue-Notchpad-<version>-macOS-arm64.zip
+```
+
+`make install` 安装 debug 开发构建；`make install-app-release` 安装本地 Release 候选；`make install-release` 安装已下载并校验的 ZIP。为精确复现用户正在运行的公开版本，可让 Make 下载指定的正式资产、校验其官方 `SHA256SUMS` 后安装：
+
+```bash
+make install-published-release VERSION=0.3.1
+```
+
+该命令不会从源码重建；它安装的 ZIP 与用户下载的正式 Release 相同。每个 app bundle 的 `Contents/Resources/BuildInfo.json` 和 Release 附带的 `PROVENANCE.json` 记录版本、构建号、源码 revision、配置、架构及工具链信息。
 
 ## 在源码版与 Homebrew 版之间切换
 

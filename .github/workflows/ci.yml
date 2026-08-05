@@ -30,6 +30,14 @@ jobs:
         run: |
           set -euo pipefail
           bash -n Scripts/*.sh
+          rendered_cask="$(mktemp /tmp/cue-notchpad.XXXXXX.rb)"
+          ./Scripts/render-homebrew-cask.sh \
+            0.0.0 0000000000000000000000000000000000000000000000000000000000000000 \
+            "$rendered_cask"
+          ruby -c "$rendered_cask"
+          grep -q 'version "0.0.0"' "$rendered_cask"
+          grep -q 'sha256 "0000000000000000000000000000000000000000000000000000000000000000"' "$rendered_cask"
+          rm -f "$rendered_cask"
           python3 - <<'PY'
           from pathlib import Path
           compile(Path("Scripts/generate-tokenizer-index.py").read_text(), "generate-tokenizer-index.py", "exec")
@@ -52,12 +60,12 @@ jobs:
       - name: Run core test suite
         run: make test
 
-      - name: Build and validate native app bundle
+      - name: Build and validate release app bundle
         shell: bash
         run: |
           set -euo pipefail
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Supporting/Info.plist)"
-          RELEASE_VERSION="$version" BUILD_NUMBER="$GITHUB_RUN_NUMBER" make app
+          RELEASE_VERSION="$version" BUILD_NUMBER="$GITHUB_RUN_NUMBER" make app-release
           app="build/Cue Notchpad.app"
           plutil -lint "$app/Contents/Info.plist"
           codesign --verify --deep --strict --verbose=2 "$app"
@@ -67,6 +75,17 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = "io.github.haotzops.cue-notchpad"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = "$GITHUB_RUN_NUMBER"
+          python3 - "$app/Contents/Resources/BuildInfo.json" "$version" "$GITHUB_RUN_NUMBER" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          document = json.loads(Path(sys.argv[1]).read_text())
+          assert document["schemaVersion"] == 1
+          assert document["version"] == sys.argv[2]
+          assert document["buildNumber"] == int(sys.argv[3])
+          assert document["configuration"] == "release"
+          assert document["architectures"] == ["arm64"]
+          PY
           xcrun lipo -archs "$app/Contents/MacOS/cue" | grep -qw "$(uname -m)"
           xcrun lipo -archs "$app/Contents/MacOS/cue-host" | grep -qw "$(uname -m)"
           set +e
@@ -75,21 +94,33 @@ jobs:
           set -e
           test "$status" -eq 64
 
-      - name: Build and validate universal release archive
+      - name: Build and validate arm64 release archive
         shell: bash
         run: |
           set -euo pipefail
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Supporting/Info.plist)"
           RELEASE_VERSION="$version" BUILD_NUMBER="$GITHUB_RUN_NUMBER" make release
-          archive="dist/Cue-Notchpad-$version-macOS-universal.zip"
+          archive="dist/Cue-Notchpad-$version-macOS-arm64.zip"
           test -f "$archive"
           (cd dist && shasum -a 256 -c SHA256SUMS)
+          python3 - dist/PROVENANCE.json "$version" "$GITHUB_RUN_NUMBER" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          document = json.loads(Path(sys.argv[1]).read_text())
+          assert document["schemaVersion"] == 1
+          assert document["version"] == sys.argv[2]
+          assert document["buildNumber"] == int(sys.argv[3])
+          assert document["configuration"] == "release"
+          assert document["architectures"] == ["arm64"]
+          PY
           rm -rf /tmp/cue-release-check
           mkdir -p /tmp/cue-release-check
           ditto -x -k "$archive" /tmp/cue-release-check
           app="/tmp/cue-release-check/Cue Notchpad.app"
+          cmp dist/PROVENANCE.json "$app/Contents/Resources/BuildInfo.json"
           codesign --verify --deep --strict --verbose=2 "$app"
           for executable in cue cue-host; do
             archs="$(xcrun lipo -archs "$app/Contents/MacOS/$executable")"
-            [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]]
+            [[ "$archs" == "arm64" ]]
           done
