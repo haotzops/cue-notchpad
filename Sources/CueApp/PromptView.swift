@@ -87,7 +87,14 @@ final class PromptModel: ObservableObject {
             return
         }
 
-        editorTokenEstimate = nil
+        // Keep the previous estimate while a count is in flight; stale results
+        // are dropped below. Only a genuinely unavailable counter surfaces nil.
+        guard tokenCounter.isAvailable else {
+            tokenRequest = nil
+            editorTokenEstimate = nil
+            return
+        }
+
         let request = TokenCountCancellation()
         tokenRequest = request
         Self.tokenQueue.asyncAfter(deadline: .now() + 0.12) { [weak self, tokenCounter] in

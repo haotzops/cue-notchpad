@@ -318,6 +318,8 @@ expect(
     ),
     "callers can inject a text token counter without a bundled vocabulary"
 )
+expect(injectedCounter.isAvailable, "custom counters are available by default")
+expect(TokenCounterRegistry.shared.isAvailable, "bundled registry reports availability")
 
 if failureCount == 0 {
     print("All CueCore tests passed")

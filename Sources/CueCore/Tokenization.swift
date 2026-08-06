@@ -50,11 +50,21 @@ public struct TokenCountEstimate: Sendable, Equatable {
 /// Counts text locally for a declared target. A nil result means counting was
 /// unavailable or cancelled; it never represents an API-reported usage value.
 public protocol TextTokenCounting: Sendable {
+    /// Whether a count can be produced right now. Consumers keep the previous
+    /// estimate while a count is in flight and only surface "unavailable"
+    /// when this is false, so typing does not flash a misleading state.
+    var isAvailable: Bool { get }
+
     func count(
         _ text: String,
         for target: TokenCountingTarget,
         cancellingWhen shouldCancel: @escaping @Sendable () -> Bool
     ) -> TokenCountEstimate?
+}
+
+public extension TextTokenCounting {
+    /// Custom counters are considered available unless they declare otherwise.
+    var isAvailable: Bool { true }
 }
 
 /// Resolves local tokenizers for UI display and request budgeting. It never
@@ -65,6 +75,8 @@ public final class TokenCounterRegistry: TextTokenCounting, @unchecked Sendable 
     private let cl100kBase = CL100KTokenCounter.shared
 
     public init() {}
+
+    public var isAvailable: Bool { cl100kBase.isAvailable }
 
     public func count(
         _ text: String,
