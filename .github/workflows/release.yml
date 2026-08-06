@@ -87,8 +87,13 @@ jobs:
             --notes-file "Docs/releases/$GITHUB_REF_NAME.md" \
             --verify-tag
 
-          release_id="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
-            --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\" and .draft == true) | .id")"
+          release_id=""
+          for _ in $(seq 1 12); do
+            release_id="$(gh release view "$GITHUB_REF_NAME" --json databaseId,isDraft \
+              --jq 'select(.isDraft == true) | .databaseId' 2>/dev/null || true)"
+            [[ "$release_id" =~ ^[0-9]+$ ]] && break
+            sleep 2
+          done
           [[ "$release_id" =~ ^[0-9]+$ ]] || {
             echo "Unable to identify the draft release for $GITHUB_REF_NAME." >&2
             exit 1
