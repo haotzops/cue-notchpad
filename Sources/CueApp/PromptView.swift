@@ -34,18 +34,21 @@ final class PromptModel: ObservableObject {
     @Published private(set) var text: String {
         didSet { scheduleTokenCount() }
     }
-    @Published var tokenCount: Int? = 0
-    @Published private(set) var fimInputTokens = 0
-    @Published private(set) var fimOutputTokens = 0
+    @Published private(set) var editorTokenEstimate: TokenCountEstimate?
+    @Published private(set) var apiInputTokens = 0
+    @Published private(set) var apiOutputTokens = 0
     /// Published atomically from one AppKit layout pass. Keeping the viewport
     /// and required text height together prevents panel resizing from combining
     /// values from different TextKit/SwiftUI layout passes.
     @Published private(set) var editorLayoutMetrics: EditorLayoutMetrics?
 
+    private let tokenCounter: any TextTokenCounting
     private var tokenRequest: TokenCountCancellation?
 
-    init(text: String) {
+    init(text: String, tokenCounter: any TextTokenCounting = TokenCounterRegistry.shared) {
         self.text = text
+        self.tokenCounter = tokenCounter
+        editorTokenEstimate = .init(count: 0, tokenizer: .cl100kBase, accuracy: .exact)
         scheduleTokenCount()
     }
 
@@ -61,9 +64,9 @@ final class PromptModel: ObservableObject {
         text = value
     }
 
-    func recordFIMUsage(input: Int, output: Int) {
-        fimInputTokens += input
-        fimOutputTokens += output
+    func recordAPIUsage(_ usage: LLMAPIUsage) {
+        apiInputTokens += usage.inputTokens
+        apiOutputTokens += usage.outputTokens
     }
 
     func updateEditorLayoutMetrics(_ metrics: EditorLayoutMetrics) {
@@ -80,20 +83,18 @@ final class PromptModel: ObservableObject {
         let snapshot = text
         guard !snapshot.isEmpty else {
             tokenRequest = nil
-            tokenCount = 0
-            return
-        }
-        guard CueTokenCounter.shared.isAvailable else {
-            tokenCount = nil
+            editorTokenEstimate = .init(count: 0, tokenizer: .cl100kBase, accuracy: .exact)
             return
         }
 
+        editorTokenEstimate = nil
         let request = TokenCountCancellation()
         tokenRequest = request
-        Self.tokenQueue.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+        Self.tokenQueue.asyncAfter(deadline: .now() + 0.12) { [weak self, tokenCounter] in
             guard !request.isCancelled,
-                  let count = CueTokenCounter.shared.count(
+                  let estimate = tokenCounter.count(
                     snapshot,
+                    for: .editorDisplay,
                     cancellingWhen: { request.isCancelled }
                   )
             else { return }
@@ -103,7 +104,7 @@ final class PromptModel: ObservableObject {
                       self.text == snapshot
                 else { return }
                 self.tokenRequest = nil
-                self.tokenCount = count
+                self.editorTokenEstimate = estimate
             }
         }
     }
@@ -283,8 +284,8 @@ struct PromptView: View {
 
                     Text(String(
                         format: CueLocalization.string(.fimUsage,  localization: settings.localizationIdentifier),
-                        Int64(presentation.model.fimInputTokens),
-                        Int64(presentation.model.fimOutputTokens)
+                        Int64(presentation.model.apiInputTokens),
+                        Int64(presentation.model.apiOutputTokens)
                     ))
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.28))
@@ -339,10 +340,10 @@ struct PromptView: View {
     }
 
     private var tokenCount: String {
-        guard let count = presentation.model.tokenCount else {
+        guard let estimate = presentation.model.editorTokenEstimate else {
             return localized(.tokenUnavailable)
         }
-        return CueLocalization.tokenCount(count, localization: localization)
+        return CueLocalization.tokenCount(estimate.count, localization: localization)
     }
 
     private func localized(_ key: CueLocalizedKey) -> String {

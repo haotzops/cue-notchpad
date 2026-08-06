@@ -1,4 +1,5 @@
 import Combine
+import CueCore
 import Foundation
 
 struct CueUsageRecord: Codable, Identifiable {
@@ -43,15 +44,24 @@ final class CueUsageStore: ObservableObject {
         isReadOnly = loaded.isReadOnly
     }
 
-    func recordFIMRequest(model: String) {
+    func recordCompletionRequest(model: String) {
         guard !isReadOnly else { return }
         records.append(.init(id: UUID(), date: .now, kind: .fimRequest, model: model, inputTokens: 0, outputTokens: 0))
         persist()
     }
 
-    func recordFIM(model: String, inputTokens: Int, outputTokens: Int) {
+    func recordCompletionUsage(model: String, usage: LLMAPIUsage) {
         guard !isReadOnly else { return }
-        records.append(.init(id: UUID(), date: .now, kind: .fim, model: model, inputTokens: inputTokens, outputTokens: outputTokens))
+        // Archive v1 calls this historical completion kind "fim". Keep that
+        // stored value until a separately versioned archive migration changes it.
+        records.append(.init(
+            id: UUID(),
+            date: .now,
+            kind: .fim,
+            model: model,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens
+        ))
         persist()
     }
 

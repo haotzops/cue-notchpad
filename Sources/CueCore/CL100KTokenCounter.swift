@@ -2,8 +2,8 @@ import Foundation
 
 /// Counts `cl100k_base` tokens locally. The vocabulary is bundled with the app,
 /// so counting never sends prompt text over the network.
-public final class CueTokenCounter: @unchecked Sendable {
-    public static let shared = CueTokenCounter()
+public final class CL100KTokenCounter: @unchecked Sendable {
+    public static let shared = CL100KTokenCounter()
 
     private let vocabulary: CueTokenVocabulary?
     private let pattern: Regex<AnyRegexOutput>?

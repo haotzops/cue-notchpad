@@ -3,6 +3,17 @@ import CueCore
 import Darwin
 import Foundation
 
+private struct FixedTokenCounter: TextTokenCounting {
+    func count(
+        _ text: String,
+        for target: TokenCountingTarget,
+        cancellingWhen shouldCancel: @escaping @Sendable () -> Bool = { false }
+    ) -> TokenCountEstimate? {
+        guard !shouldCancel(), text == "draft" else { return nil }
+        return .init(count: 13, tokenizer: target.tokenizer, accuracy: target.accuracy)
+    }
+}
+
 private var failureCount = 0
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
@@ -250,7 +261,7 @@ do {
     expect(false, "SSE parser should parse: \(error)")
 }
 
-let tokenCounter = CueTokenCounter.shared
+let tokenCounter = CL100KTokenCounter.shared
 expect(tokenCounter.count("") == 0, "empty token count")
 expect(tokenCounter.count("hello world") == 2, "basic cl100k token count")
 expect(tokenCounter.count("Hello, world!") == 4, "punctuated cl100k token count")
@@ -273,6 +284,39 @@ for (text, expectedCount) in tokenVectors {
 expect(
     tokenCounter.count("cancel me", cancellingWhen: { true }) == nil,
     "cancelled token count"
+)
+
+let tokenCounters = TokenCounterRegistry.shared
+let editorEstimate = tokenCounters.count("hello world", for: .editorDisplay)
+expect(
+    editorEstimate == .init(count: 2, tokenizer: .cl100kBase, accuracy: .exact),
+    "editor display uses an exact local tokenizer count"
+)
+let apiEstimate = tokenCounters.count(
+    "hello world",
+    for: .apiInput(model: "user-selected-model", tokenizer: .cl100kBase, accuracy: .estimated)
+)
+expect(
+    apiEstimate == .init(count: 2, tokenizer: .cl100kBase, accuracy: .estimated),
+    "API input budgeting preserves its estimated accuracy"
+)
+expect(
+    tokenCounters.count("cancel me", for: .editorDisplay, cancellingWhen: { true }) == nil,
+    "registry propagates cancellation"
+)
+expect(
+    LLMAPIUsage(inputTokens: -1, outputTokens: 7) == .init(inputTokens: 0, outputTokens: 7),
+    "API usage is a bounded, independent accounting value"
+)
+
+private let injectedCounter = FixedTokenCounter()
+expect(
+    injectedCounter.count("draft", for: .editorDisplay) == .init(
+        count: 13,
+        tokenizer: .cl100kBase,
+        accuracy: .exact
+    ),
+    "callers can inject a text token counter without a bundled vocabulary"
 )
 
 if failureCount == 0 {

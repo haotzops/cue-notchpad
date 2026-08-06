@@ -89,8 +89,8 @@ struct PromptTextEditor: NSViewRepresentable {
         )
         textView.textContainer?.widthTracksTextView = true
         textView.identifier = NSUserInterfaceItemIdentifier("cue.prompt.editor")
-        context.coordinator.inlineCompletionController.onUsage = { [weak model] input, output in
-            model?.recordFIMUsage(input: input, output: output)
+        context.coordinator.inlineCompletionController.onUsage = { [weak model] usage in
+            model?.recordAPIUsage(usage)
         }
         context.coordinator.inlineCompletionController.attach(to: textView, settings: settings)
         scrollView.documentView = textView
@@ -107,8 +107,8 @@ struct PromptTextEditor: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
-        context.coordinator.inlineCompletionController.onUsage = { [weak model] input, output in
-            model?.recordFIMUsage(input: input, output: output)
+        context.coordinator.inlineCompletionController.onUsage = { [weak model] usage in
+            model?.recordAPIUsage(usage)
         }
         context.coordinator.inlineCompletionController.updateSettings(settings)
         (scrollView.documentView as? CueTextView)?.promptExpansionShortcut = settings.promptExpansionShortcut

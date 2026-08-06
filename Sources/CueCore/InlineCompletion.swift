@@ -99,6 +99,11 @@ public struct DeepSeekFIMUsage: Decodable, Sendable {
     public let promptTokens: Int
     public let completionTokens: Int
     public let totalTokens: Int
+
+    public var apiUsage: LLMAPIUsage {
+        .init(inputTokens: promptTokens, outputTokens: completionTokens)
+    }
+
     enum CodingKeys: String, CodingKey {
         case promptTokens = "prompt_tokens"
         case completionTokens = "completion_tokens"

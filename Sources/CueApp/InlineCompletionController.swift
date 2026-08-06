@@ -15,7 +15,7 @@ final class InlineCompletionController {
     private var lastRequestCancelledAt: Date?
     private let requestCooldown: TimeInterval = 1.5
     private let cancellationQuietPeriod: TimeInterval = 1.0
-    var onUsage: ((Int, Int) -> Void)?
+    var onUsage: ((LLMAPIUsage) -> Void)?
 
     init(provider: any InlineCompletionProvider = DeepSeekFIMCompletionProvider()) {
         self.provider = provider
@@ -106,7 +106,7 @@ final class InlineCompletionController {
 
         requestID += 1
         lastRequestStartedAt = .now
-        CueUsageStore.shared.recordFIMRequest(model: model)
+        CueUsageStore.shared.recordCompletionRequest(model: model)
         let expectedRequestID = requestID
         let expectedSelection = textView.selectedRange()
         let request = InlineCompletionRequest(
@@ -130,12 +130,9 @@ final class InlineCompletionController {
                             selection: expectedSelection
                         )
                     case .usage(let usage):
-                        CueUsageStore.shared.recordFIM(
-                            model: request.model,
-                            inputTokens: usage.promptTokens,
-                            outputTokens: usage.completionTokens
-                        )
-                        self?.onUsage?(usage.promptTokens, usage.completionTokens)
+                        let apiUsage = usage.apiUsage
+                        CueUsageStore.shared.recordCompletionUsage(model: request.model, usage: apiUsage)
+                        self?.onUsage?(apiUsage)
                     case .finished:
                         break
                     }

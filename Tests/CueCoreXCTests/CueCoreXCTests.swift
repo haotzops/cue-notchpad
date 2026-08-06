@@ -59,13 +59,13 @@ final class CueCoreXCTests: XCTestCase {
         let usage = CueUsageStore(defaults: defaults)
         XCTAssertEqual(usage.records.count, 1)
         XCTAssertEqual(usage.records.first?.totalTokens, 46)
-        usage.recordFIMRequest(model: "new-model")
+        usage.recordCompletionRequest(model: "new-model")
         XCTAssertEqual(usage.records.count, 2)
 
         let future = Data("{\"schemaVersion\":2,\"records\":[],\"cueOpenCount\":0,\"cueOpenDates\":[],\"futureField\":true}".utf8)
         defaults.set(future, forKey: "cueUsageArchive.v1")
         let futureUsage = CueUsageStore(defaults: defaults)
-        futureUsage.recordFIMRequest(model: "must-not-write")
+        futureUsage.recordCompletionRequest(model: "must-not-write")
         XCTAssertEqual(defaults.data(forKey: "cueUsageArchive.v1"), future)
     }
 
@@ -93,6 +93,19 @@ final class CueCoreXCTests: XCTestCase {
         XCTAssertEqual(defaults.data(forKey: "cueUsageArchive.v1"), future)
     }
 
+    @MainActor
+    func testPromptModelUsesInjectedCounterForTheLatestDocument() async throws {
+        let model = PromptModel(text: "old", tokenCounter: CharacterTokenCounter())
+        model.acceptCommittedText("latest")
+
+        try await Task.sleep(for: .milliseconds(300))
+
+        XCTAssertEqual(
+            model.editorTokenEstimate,
+            TokenCountEstimate(count: 6, tokenizer: .cl100kBase, accuracy: .exact)
+        )
+    }
+
     private func fixtureData(named name: String) throws -> Data {
         let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         return try Data(contentsOf: testsDirectory.appendingPathComponent("Fixtures/Persistence/\(name)"))
@@ -100,6 +113,20 @@ final class CueCoreXCTests: XCTestCase {
 
     private func jsonObject(at url: URL) throws -> [String: Any] {
         try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    }
+}
+private struct CharacterTokenCounter: TextTokenCounting {
+    func count(
+        _ text: String,
+        for target: TokenCountingTarget,
+        cancellingWhen shouldCancel: @escaping @Sendable () -> Bool
+    ) -> TokenCountEstimate? {
+        guard !shouldCancel() else { return nil }
+        return TokenCountEstimate(
+            count: text.count,
+            tokenizer: target.tokenizer,
+            accuracy: target.accuracy
+        )
     }
 }
 #endif
