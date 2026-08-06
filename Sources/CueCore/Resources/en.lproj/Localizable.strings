@@ -125,6 +125,21 @@
 "settings.rewrite_prompt.hint" = "Changes save automatically and apply to the next rewrite request. The prompt can ask AI to translate, rewrite, expand, or add detail.";
 
 "settings.model_api_configuration" = "Model API Configuration";
+"settings.pi_integration" = "Pi Integration";
+"settings.pi_integration.install" = "Install";
+"settings.pi_integration.repair" = "Repair";
+"settings.pi_integration.uninstall" = "Uninstall";
+"settings.pi_integration.installed_format" = "Installed (v%lld)";
+"settings.pi_integration.not_installed" = "Not installed";
+"settings.pi_integration.needs_repair" = "Needs repair";
+"settings.pi_integration.foreign" = "Foreign directory";
+"settings.pi_integration.foreign_hint" = "A directory exists at this path without a valid Cue manifest. Cue will not modify or delete it; remove it manually if it is leftover.";
+"settings.pi_integration.path" = "Path:";
+"settings.pi_integration.required" = "Install the Pi integration to enable inline suggestions.";
+"settings.pi_integration.external_editor_hint" = "After installing, configure Pi's externalEditor (Cue never changes Pi settings for you):";
+"settings.pi_integration.copy" = "Copy";
+"settings.pi_integration.copied" = "Copied";
+"settings.pi_integration.uninstall_confirmation" = "This removes the Cue-managed Pi integration extension from the Pi agent directory.";
 "settings.ai_rewrite" = "AI Rewrite";
 "settings.usage_period" = "Statistics period";
 "settings.ai_rewrite.default_prompt" = "Rewrite and expand the following prompt without changing its meaning. Output only the final prompt, with no explanation.";

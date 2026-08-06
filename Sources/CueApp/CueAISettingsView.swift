@@ -1,9 +1,12 @@
+import AppKit
 import CueCore
 import SwiftUI
 
 struct CueAISettingsView: View {
     @ObservedObject var settings: CueSettings
     @Binding var deepSeekAPIKey: String
+    @State private var isConfirmingPiUninstall = false
+    @State private var copiedPiEditorInstruction = false
 
     var body: some View {
         modelAPIConfiguration
@@ -59,7 +62,16 @@ struct CueAISettingsView: View {
 
     private var inlineCompletion: some View {
         Section(settings.localized(.settingsFIM)) {
+            piIntegrationControls
+
             Toggle(settings.localized(.settingsInlineCompletion), isOn: $settings.inlineCompletionEnabled)
+                .disabled(!settings.piIntegrationInstalled)
+
+            if !settings.piIntegrationInstalled {
+                Text(settings.localized(.settingsPiIntegrationRequired))
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
             VStack(alignment: .leading, spacing: 6) {
                 Text(settings.localized(.settingsInlineCompletionHint))
                     .font(.footnote)
@@ -120,6 +132,112 @@ struct CueAISettingsView: View {
                         .labelsHidden()
                 }
             }
+        }
+    }
+
+    private var piIntegrationControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            LabeledContent(settings.localized(.settingsPiIntegration)) {
+                Text(piIntegrationStatusText)
+                    .font(.footnote)
+                    .foregroundStyle(piIntegrationStatusColor)
+            }
+
+            Text("\(settings.localized(.settingsPiIntegrationPath)) \(settings.piIntegrationDirectoryPath)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                switch settings.piIntegrationState {
+                case .notInstalled:
+                    Button(settings.localized(.settingsPiIntegrationInstall)) {
+                        settings.installPiIntegration()
+                    }
+                case .installed:
+                    Button(settings.localized(.settingsPiIntegrationUninstall), role: .destructive) {
+                        isConfirmingPiUninstall = true
+                    }
+                    .confirmationDialog(
+                        settings.localized(.settingsPiIntegrationUninstallConfirmation),
+                        isPresented: $isConfirmingPiUninstall,
+                        titleVisibility: .visible
+                    ) {
+                        Button(settings.localized(.settingsPiIntegrationUninstall), role: .destructive) {
+                            settings.uninstallPiIntegration()
+                        }
+                        Button(settings.localized(.settingsCancel), role: .cancel) {}
+                    }
+                case .needsRepair:
+                    Button(settings.localized(.settingsPiIntegrationRepair)) {
+                        settings.repairPiIntegration()
+                    }
+                case .foreign:
+                    EmptyView()
+                }
+            }
+
+            if case .foreign = settings.piIntegrationState {
+                Text(settings.localized(.settingsPiIntegrationForeignHint))
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+
+            if let message = settings.piIntegrationErrorMessage {
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(settings.localized(.settingsPiIntegrationExternalEditorHint))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text(piExternalEditorInstruction)
+                        .font(.system(.footnote, design: .monospaced))
+                        .textSelection(.enabled)
+                    Button {
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        pasteboard.setString(piExternalEditorInstruction, forType: .string)
+                        copiedPiEditorInstruction = true
+                    } label: {
+                        Label(
+                            copiedPiEditorInstruction
+                                ? settings.localized(.settingsPiIntegrationCopied)
+                                : settings.localized(.settingsPiIntegrationCopy),
+                            systemImage: copiedPiEditorInstruction ? "checkmark" : "doc.on.doc"
+                        )
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+        }
+        .onAppear { settings.refreshPiIntegrationState() }
+    }
+
+    private var piExternalEditorInstruction: String {
+        #""externalEditor": "cue --wait""#
+    }
+
+    private var piIntegrationStatusText: String {
+        switch settings.piIntegrationState {
+        case .notInstalled:
+            settings.localized(.settingsPiIntegrationNotInstalled)
+        case .installed(let version):
+            String(format: settings.localized(.settingsPiIntegrationInstalledFormat), Int64(version))
+        case .needsRepair:
+            settings.localized(.settingsPiIntegrationNeedsRepair)
+        case .foreign:
+            settings.localized(.settingsPiIntegrationForeign)
+        }
+    }
+
+    private var piIntegrationStatusColor: Color {
+        switch settings.piIntegrationState {
+        case .installed: .green
+        case .needsRepair, .foreign: .red
+        case .notInstalled: .secondary
         }
     }
 

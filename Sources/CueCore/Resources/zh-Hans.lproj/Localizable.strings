@@ -125,6 +125,21 @@
 "settings.rewrite_prompt.hint" = "修改会自动保存，并在下次重写时应用。提示词中可以让 AI 翻译、重写、扩写或补充细节。";
 
 "settings.model_api_configuration" = "模型 API 配置";
+"settings.pi_integration" = "Pi 集成";
+"settings.pi_integration.install" = "安装";
+"settings.pi_integration.repair" = "修复";
+"settings.pi_integration.uninstall" = "卸载";
+"settings.pi_integration.installed_format" = "已安装（v%lld）";
+"settings.pi_integration.not_installed" = "未安装";
+"settings.pi_integration.needs_repair" = "需要修复";
+"settings.pi_integration.foreign" = "外来目录";
+"settings.pi_integration.foreign_hint" = "该路径已存在目录但没有有效的 Cue manifest。Cue 不会修改或删除它；如为残留可手动移除。";
+"settings.pi_integration.path" = "路径：";
+"settings.pi_integration.required" = "请先安装 Pi 集成以启用内联建议。";
+"settings.pi_integration.external_editor_hint" = "安装后，请配置 Pi 的 externalEditor（Cue 不会自动修改 Pi 设置）：";
+"settings.pi_integration.copy" = "复制";
+"settings.pi_integration.copied" = "已复制";
+"settings.pi_integration.uninstall_confirmation" = "这将从 Pi agent 目录移除由 Cue 管理的 Pi 集成扩展。";
 "settings.ai_rewrite" = "AI 重写";
 "settings.usage_period" = "统计周期";
 "settings.ai_rewrite.default_prompt" = "在不改变原意的前提下，重写并扩写以下 prompt；只输出最终 prompt，不要解释。";

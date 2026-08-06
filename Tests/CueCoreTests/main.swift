@@ -23,6 +23,16 @@ private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     }
 }
 
+private func expectThrows<Result>(_ body: @autoclosure () throws -> Result, _ message: String) {
+    do {
+        _ = try body()
+        failureCount += 1
+        FileHandle.standardError.write(Data("FAIL: \(message)\n".utf8))
+    } catch {
+        // Expected.
+    }
+}
+
 do {
     let arguments = try CueArguments(arguments: ["--wait"])
     expect(arguments.waitsForEditing, "--wait should enable waiting")
@@ -320,6 +330,76 @@ expect(
 )
 expect(injectedCounter.isAvailable, "custom counters are available by default")
 expect(TokenCounterRegistry.shared.isAvailable, "bundled registry reports availability")
+
+do {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("cue-pi-tests-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let piService = CuePiIntegrationService(agentDirectory: root)
+    expect(piService.state() == .notInstalled, "fresh agent directory reports not installed")
+
+    try piService.install()
+    expect(
+        piService.state() == .installed(version: CuePiIntegrationService.integrationVersion),
+        "install produces a checksum-verified installation"
+    )
+
+    try piService.install()
+    expect(
+        piService.state() == .installed(version: CuePiIntegrationService.integrationVersion),
+        "reinstall stays verified"
+    )
+
+    let extensionURL = piService.integrationDirectory.appendingPathComponent("index.ts")
+    try Data("tampered".utf8).write(to: extensionURL)
+    expect(
+        piService.state() == .needsRepair(installedVersion: CuePiIntegrationService.integrationVersion),
+        "modified managed files require repair"
+    )
+
+    try piService.repair()
+    expect(
+        piService.state() == .installed(version: CuePiIntegrationService.integrationVersion),
+        "repair restores a verified installation"
+    )
+
+    try FileManager.default.removeItem(
+        at: piService.integrationDirectory.appendingPathComponent("manifest.json")
+    )
+    expect(piService.state() == .foreign, "missing manifest is a foreign directory")
+    expectThrows(try piService.install(), "install refuses a foreign directory")
+    expectThrows(try piService.uninstall(), "uninstall refuses a foreign directory")
+
+    // A foreign directory is read-only; simulate manual cleanup before
+    // reinstalling.
+    try FileManager.default.removeItem(at: piService.integrationDirectory)
+    try piService.install()
+    let manifestURL = piService.integrationDirectory.appendingPathComponent("manifest.json")
+    var futureManifest = try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL))
+        as? [String: Any] ?? [:]
+    futureManifest["schemaVersion"] = CuePiIntegrationService.integrationVersion + 1
+    try JSONSerialization.data(withJSONObject: futureManifest).write(to: manifestURL)
+    expect(piService.state() == .foreign, "future manifest schema is read-only")
+
+    // A future-schema directory is read-only; simulate the manual cleanup a
+    // user would do before reinstalling.
+    try FileManager.default.removeItem(at: piService.integrationDirectory)
+    try piService.install()
+    try piService.uninstall()
+    expect(piService.state() == .notInstalled, "uninstall removes a verified installation")
+    expect(
+        !FileManager.default.fileExists(atPath: piService.integrationDirectory.path),
+        "uninstall deletes the managed directory"
+    )
+
+    try piService.install()
+    try Data("tampered".utf8).write(to: extensionURL)
+    expectThrows(try piService.uninstall(), "uninstall refuses modified files until repaired")
+} catch {
+    expect(false, "pi integration service should not throw: \(error)")
+}
 
 if failureCount == 0 {
     print("All CueCore tests passed")

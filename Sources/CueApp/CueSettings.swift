@@ -55,6 +55,7 @@ final class CueSettings: ObservableObject {
     static let maximumEditorFontSize = 72.0
 
     private let deepSeekService: any DeepSeekService
+    private let piIntegrationService: CuePiIntegrationService
 
     @Published var language: CueLanguage {
         didSet { Self.defaults.set(language.rawValue, forKey: Keys.language) }
@@ -145,6 +146,9 @@ final class CueSettings: ObservableObject {
     @Published var inlineCompletionKeyConfigured = false
     @Published private(set) var inlineCompletionStatus: InlineCompletionStatus?
 
+    @Published private(set) var piIntegrationState: PiIntegrationState = .notInstalled
+    @Published private(set) var piIntegrationErrorMessage: String?
+
     @Published var toggleShortcut: CueShortcut {
         didSet { save(toggleShortcut, key: Keys.toggleShortcut) }
     }
@@ -220,8 +224,12 @@ final class CueSettings: ObservableObject {
         .systemFont(ofSize: CGFloat(defaultEditorFontSize), weight: .regular)
     }
 
-    init(deepSeekService: any DeepSeekService = DeepSeekFIMCompletionProvider()) {
+    init(
+        deepSeekService: any DeepSeekService = DeepSeekFIMCompletionProvider(),
+        piIntegrationService: CuePiIntegrationService = .shared
+    ) {
         self.deepSeekService = deepSeekService
+        self.piIntegrationService = piIntegrationService
         if Self.defaults.object(forKey: Keys.schemaVersion) == nil {
             Self.defaults.set(Self.persistenceSchemaVersion, forKey: Keys.schemaVersion)
         }
@@ -281,7 +289,43 @@ final class CueSettings: ObservableObject {
         )
         inlineCompletionAcceptShortcut = Self.loadShortcut(key: Keys.inlineCompletionAcceptShortcut, fallback: CueShortcut(keyCode: 48, modifiers: 0))
         promptExpansionShortcut = Self.loadShortcut(key: Keys.promptExpansionShortcut, fallback: .promptExpansionDefault)
+        piIntegrationState = piIntegrationService.state()
         if inlineCompletionEnabled { refreshDeepSeekModelsIfPossible() }
+    }
+
+    var piIntegrationInstalled: Bool {
+        if case .installed = piIntegrationState { return true }
+        return false
+    }
+
+    var piIntegrationDirectoryPath: String {
+        piIntegrationService.integrationDirectory.path
+    }
+
+    func refreshPiIntegrationState() {
+        piIntegrationState = piIntegrationService.state()
+    }
+
+    func installPiIntegration() {
+        runPiIntegrationAction { try piIntegrationService.install() }
+    }
+
+    func repairPiIntegration() {
+        runPiIntegrationAction { try piIntegrationService.repair() }
+    }
+
+    func uninstallPiIntegration() {
+        runPiIntegrationAction { try piIntegrationService.uninstall() }
+    }
+
+    private func runPiIntegrationAction(_ action: () throws -> Void) {
+        do {
+            try action()
+            piIntegrationErrorMessage = nil
+        } catch {
+            piIntegrationErrorMessage = error.localizedDescription
+        }
+        refreshPiIntegrationState()
     }
 
     func saveDeepSeekAPIKey(_ key: String) {
