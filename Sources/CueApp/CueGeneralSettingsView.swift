@@ -5,7 +5,6 @@ import SwiftUI
 struct CueGeneralSettingsView: View {
     @ObservedObject var settings: CueSettings
     @State private var isConfirmingRestoreAll = false
-    @State private var isConfirmingUsageClear = false
 
     var body: some View {
         Section {
@@ -136,30 +135,6 @@ struct CueGeneralSettingsView: View {
                 actionDescription(
                     title: settings.localized(.settingsRestoreAll),
                     detail: settings.localized(.settingsRestoreAllDetail)
-                )
-            }
-
-            Divider()
-
-            LabeledContent {
-                Button(settings.localized(.settingsClear)) {
-                    isConfirmingUsageClear = true
-                }
-                .tint(.red)
-                .confirmationDialog(
-                    settings.localized(.settingsClearUsageConfirmation),
-                    isPresented: $isConfirmingUsageClear,
-                    titleVisibility: .visible
-                ) {
-                    Button(settings.localized(.settingsClearUsage), role: .destructive) {
-                        CueUsageStore.shared.clearUsageStatistics()
-                    }
-                    Button(settings.localized(.settingsCancel), role: .cancel) {}
-                }
-            } label: {
-                actionDescription(
-                    title: settings.localized(.settingsClearUsage),
-                    detail: settings.localized(.settingsClearUsageDetail)
                 )
             }
         }

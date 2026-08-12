@@ -34,8 +34,17 @@ public struct CueSessionRequest: Codable, Sendable, Equatable {
     public let callerPID: Int32
     public let callerName: String?
     public let workingDirectory: String
+    public let piRewriteContext: PiRewriteContext?
 
-    public init(id: UUID = UUID(), initialText: String, document: CueDocument, callerPID: Int32, callerName: String?, workingDirectory: String) {
+    public init(
+        id: UUID = UUID(),
+        initialText: String,
+        document: CueDocument,
+        callerPID: Int32,
+        callerName: String?,
+        workingDirectory: String,
+        piRewriteContext: PiRewriteContext? = nil
+    ) {
         self.version = CueIPC.protocolVersion
         self.id = id
         self.initialText = initialText
@@ -43,6 +52,7 @@ public struct CueSessionRequest: Codable, Sendable, Equatable {
         self.callerPID = callerPID
         self.callerName = callerName
         self.workingDirectory = workingDirectory
+        self.piRewriteContext = piRewriteContext
     }
 }
 
@@ -74,7 +84,7 @@ public enum CueSessionResponse: Codable, Sendable, Equatable {
 }
 
 public enum CueIPC {
-    public static let protocolVersion = 1
+    public static let protocolVersion = 2
     public static let socketPath = (FileManager.default.homeDirectoryForCurrentUser.path as NSString)
         .appendingPathComponent("Library/Caches/io.github.haotzops.cue-notchpad/cue.sock")
     public static let maximumMessageBytes = 8 * 1024 * 1024

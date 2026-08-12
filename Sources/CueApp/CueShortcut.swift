@@ -10,8 +10,6 @@ struct CueShortcut: Codable, Equatable {
     static let toggleDefault = CueShortcut(keyCode: 8, modifiers: NSEvent.ModifierFlags.command.union(.option).rawValue)
     static let previousDefault = CueShortcut(keyCode: 123, modifiers: NSEvent.ModifierFlags.command.union(.option).rawValue)
     static let nextDefault = CueShortcut(keyCode: 124, modifiers: NSEvent.ModifierFlags.command.union(.option).rawValue)
-    static let inlineCompletionDefault = CueShortcut(keyCode: 48, modifiers: NSEvent.ModifierFlags.shift.rawValue)
-    static let inlineCompletionAcceptDefault = CueShortcut(keyCode: 48, modifiers: 0)
     static let promptExpansionDefault = CueShortcut(keyCode: 14, modifiers: NSEvent.ModifierFlags.option.rawValue)
 
     var modifierFlags: NSEvent.ModifierFlags {

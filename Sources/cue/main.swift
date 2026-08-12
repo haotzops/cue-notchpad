@@ -83,7 +83,14 @@ do {
     }
 } catch { stderr("cue: cannot read file: \(error)"); exit(EXIT_FAILURE) }
 let document: CueDocument = args.filePath.map { .file(path: $0) } ?? .standardInput
-let request = CueSessionRequest(initialText: input, document: document, callerPID: getppid(), callerName: callerName(), workingDirectory: FileManager.default.currentDirectoryPath)
+let request = CueSessionRequest(
+    initialText: input,
+    document: document,
+    callerPID: getppid(),
+    callerName: callerName(),
+    workingDirectory: FileManager.default.currentDirectoryPath,
+    piRewriteContext: PiSessionBridge.capture()
+)
 var connection = connectSocket()
 if connection == nil {
     launchHost()

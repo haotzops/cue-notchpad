@@ -35,8 +35,6 @@ final class PromptModel: ObservableObject {
         didSet { scheduleTokenCount() }
     }
     @Published private(set) var editorTokenEstimate: TokenCountEstimate?
-    @Published private(set) var apiInputTokens = 0
-    @Published private(set) var apiOutputTokens = 0
     /// Published atomically from one AppKit layout pass. Keeping the viewport
     /// and required text height together prevents panel resizing from combining
     /// values from different TextKit/SwiftUI layout passes.
@@ -62,11 +60,6 @@ final class PromptModel: ObservableObject {
     func acceptCommittedText(_ value: String) {
         guard text != value else { return }
         text = value
-    }
-
-    func recordAPIUsage(_ usage: LLMAPIUsage) {
-        apiInputTokens += usage.inputTokens
-        apiOutputTokens += usage.outputTokens
     }
 
     func updateEditorLayoutMetrics(_ metrics: EditorLayoutMetrics) {
@@ -123,6 +116,7 @@ final class PromptPresentation: ObservableObject {
     @Published var sessionIndex = 0
     @Published var sessionCount = 1
     @Published var sessionID: UUID
+    @Published var piMessage: String?
     @Published var transitionDirection = 1
     @Published var isExpanded = false
     @Published var effectiveOpenHeight = NotchLayoutConstraints.defaultOpenHeight
@@ -131,10 +125,11 @@ final class PromptPresentation: ObservableObject {
 
     private var modelObservation: AnyCancellable?
 
-    init(model: PromptModel, sourceName: String?, sessionID: UUID) {
+    init(model: PromptModel, sourceName: String?, sessionID: UUID, piMessage: String?) {
         self.model = model
         self.sourceName = sourceName
         self.sessionID = sessionID
+        self.piMessage = piMessage
         observeModel()
     }
 
@@ -142,6 +137,7 @@ final class PromptPresentation: ObservableObject {
         model: PromptModel,
         sourceName: String?,
         sessionID: UUID,
+        piMessage: String?,
         index: Int,
         count: Int,
         direction: Int,
@@ -154,6 +150,7 @@ final class PromptPresentation: ObservableObject {
         sessionIndex = index
         sessionCount = count
         self.sourceName = sourceName
+        self.piMessage = piMessage
         guard self.sessionID != sessionID else {
             self.model = model
             observeModel()
@@ -285,19 +282,6 @@ struct PromptView: View {
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.28))
 
-                if settings.inlineCompletionEnabled {
-                    Text("·")
-                        .foregroundStyle(.white.opacity(0.18))
-
-                    Text(String(
-                        format: CueLocalization.string(.fimUsage,  localization: settings.localizationIdentifier),
-                        Int64(presentation.model.apiInputTokens),
-                        Int64(presentation.model.apiOutputTokens)
-                    ))
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.28))
-                }
-
                 Spacer()
 
                 if presentation.sessionCount > 1 {
@@ -361,6 +345,7 @@ struct PromptView: View {
         SessionEditor(
             model: presentation.model,
             settings: settings,
+            piMessage: presentation.piMessage,
             placeholder: localized(.promptPlaceholder),
             onSubmit: onSubmit,
             onCancel: onCancel,
@@ -403,6 +388,7 @@ struct PromptView: View {
 private struct SessionEditor: View {
     @ObservedObject var model: PromptModel
     @ObservedObject var settings: CueSettings
+    let piMessage: String?
     let placeholder: String
     let onSubmit: () -> Void
     let onCancel: () -> Void
@@ -415,6 +401,7 @@ private struct SessionEditor: View {
         PromptTextEditor(
             model: model,
             settings: settings,
+            piMessage: piMessage,
             editorFont: settings.editorFont,
             placeholder: placeholder,
             overflowBehavior: settings.overflowBehavior,

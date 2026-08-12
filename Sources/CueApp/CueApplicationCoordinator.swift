@@ -8,6 +8,7 @@ public final class CueApplicationCoordinator: NSObject, CueHostServerDelegate, N
         let callerName: String?
         let fd: Int32
         let model: PromptModel
+        let piMessage: String?
     }
     private let server = CueHostServer()
     private let settings = CueSettings()
@@ -50,7 +51,8 @@ public final class CueApplicationCoordinator: NSObject, CueHostServerDelegate, N
             id: request.id,
             callerName: request.callerName,
             fd: fileDescriptor,
-            model: PromptModel(text: request.initialText)
+            model: PromptModel(text: request.initialText),
+            piMessage: request.piRewriteContext?.message
         ))
         if sessions.count == 1 { active = 0 }
         else { active = sessions.count - 1 }
@@ -63,10 +65,10 @@ public final class CueApplicationCoordinator: NSObject, CueHostServerDelegate, N
         let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main ?? NSScreen.screens[0]
         let completion: (CueOutcome) -> Void = { [weak self] outcome in self?.completeActive(outcome) }
         if let controller {
-            controller.configureSession(model: session.model, sessionID: session.id, sourceName: session.callerName, index: active, count: sessions.count, direction: direction, previous: { [weak self] in self?.move(-1) }, next: { [weak self] in self?.move(1) }, completion: completion)
+            controller.configureSession(model: session.model, sessionID: session.id, sourceName: session.callerName, piMessage: session.piMessage, index: active, count: sessions.count, direction: direction, previous: { [weak self] in self?.move(-1) }, next: { [weak self] in self?.move(1) }, completion: completion)
         } else {
-            controller = PromptWindowController(model: session.model, sessionID: session.id, settings: settings, screen: screen, sourceName: session.callerName, completion: completion)
-            controller?.configureSession(model: session.model, sessionID: session.id, sourceName: session.callerName, index: active, count: sessions.count, direction: direction, previous: { [weak self] in self?.move(-1) }, next: { [weak self] in self?.move(1) }, completion: completion)
+            controller = PromptWindowController(model: session.model, sessionID: session.id, settings: settings, screen: screen, sourceName: session.callerName, piMessage: session.piMessage, completion: completion)
+            controller?.configureSession(model: session.model, sessionID: session.id, sourceName: session.callerName, piMessage: session.piMessage, index: active, count: sessions.count, direction: direction, previous: { [weak self] in self?.move(-1) }, next: { [weak self] in self?.move(1) }, completion: completion)
         }
     }
 

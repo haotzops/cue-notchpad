@@ -9,6 +9,7 @@ struct PromptTextEditor: NSViewRepresentable {
 
     @ObservedObject var model: PromptModel
     @ObservedObject var settings: CueSettings
+    let piMessage: String?
     let editorFont: NSFont
     let placeholder: String
     let overflowBehavior: CueOverflowBehavior
@@ -41,13 +42,13 @@ struct PromptTextEditor: NSViewRepresentable {
         textView.onOpenSettings = onOpenSettings
         textView.onAdjustEditorFontSize = onAdjustEditorFontSize
         textView.promptExpansionShortcut = settings.promptExpansionShortcut
-        textView.inlineCompletionAcceptShortcut = settings.inlineCompletionAcceptShortcut
+        let piMessage = piMessage
         textView.onExpandPrompt = { [weak textView, weak model, weak settings] in
             guard let textView, let model, let settings, !textView.string.isEmpty else { return }
             let original = textView.string
             Task { @MainActor in
                 do {
-                    guard let expanded = try await settings.expandPrompt(original),
+                    guard let expanded = try await settings.expandPrompt(original, message: piMessage),
                           textView.string == original
                     else { return }
                     textView.string = expanded
@@ -91,10 +92,6 @@ struct PromptTextEditor: NSViewRepresentable {
         )
         textView.textContainer?.widthTracksTextView = true
         textView.identifier = NSUserInterfaceItemIdentifier("cue.prompt.editor")
-        context.coordinator.inlineCompletionController.onUsage = { [weak model] usage in
-            model?.recordAPIUsage(usage)
-        }
-        context.coordinator.inlineCompletionController.attach(to: textView, settings: settings)
         scrollView.documentView = textView
         applyOverflowBehavior(to: scrollView)
         context.coordinator.recordInstalledText(model.text)
@@ -109,12 +106,7 @@ struct PromptTextEditor: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
-        context.coordinator.inlineCompletionController.onUsage = { [weak model] usage in
-            model?.recordAPIUsage(usage)
-        }
-        context.coordinator.inlineCompletionController.updateSettings(settings)
         (scrollView.documentView as? CueTextView)?.promptExpansionShortcut = settings.promptExpansionShortcut
-        (scrollView.documentView as? CueTextView)?.inlineCompletionAcceptShortcut = settings.inlineCompletionAcceptShortcut
         (scrollView.documentView as? CueTextView)?.placeholder = placeholder
         (scrollView.documentView as? CueTextView)?.onAdjustEditorFontSize = onAdjustEditorFontSize
         (scrollView as? CueEditorScrollView)?.onLayoutMetricsChange = onLayoutMetricsChange
@@ -159,7 +151,6 @@ struct PromptTextEditor: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: PromptTextEditor
         private var installedText: String
-        let inlineCompletionController = InlineCompletionController()
 
         init(parent: PromptTextEditor) {
             self.parent = parent
@@ -190,11 +181,6 @@ struct PromptTextEditor: NSViewRepresentable {
             // input method commits or cancels it.
             guard !textView.hasMarkedText() else { return }
             commitDocument(from: textView)
-            inlineCompletionController.textDidChange()
-        }
-
-        func textViewDidChangeSelection(_ notification: Notification) {
-            inlineCompletionController.selectionDidChange()
         }
 
         func textDidEndEditing(_ notification: Notification) {
@@ -273,72 +259,19 @@ private final class CueEditorScrollView: NSScrollView {
     }
 }
 
-struct CueInlineCompletion: Equatable {
-    let start: Int
-    let text: String
-}
-
 final class CueTextView: NSTextView {
     var onSubmit: (() -> Void)?
-    var inlineCompletionTriggerShortcut = CueShortcut.inlineCompletionDefault
-    var inlineCompletionAcceptShortcut = CueShortcut.inlineCompletionAcceptDefault
     var onCancel: (() -> Void)?
     var onHide: (() -> Void)?
     var onOpenSettings: (() -> Void)?
     var onAdjustEditorFontSize: ((Double) -> Void)?
     var promptExpansionShortcut = CueShortcut.promptExpansionDefault
     var onExpandPrompt: (() -> Void)?
-    var onAcceptInlineCompletion: (() -> Bool)?
-    var onRequestInlineCompletion: (() -> Bool)?
-    var onDismissInlineCompletion: (() -> Bool)?
-    var inlineCompletion: CueInlineCompletion? { didSet { needsDisplay = true } }
     var placeholder: String? { didSet { needsDisplay = true } }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         drawPlaceholderIfNeeded()
-        guard let completion = inlineCompletion,
-              let container = textContainer,
-              let font = self.font,
-              completion.start <= string.utf16.count
-        else { return }
-
-        let document = NSMutableAttributedString(attributedString: textStorage ?? NSAttributedString(string: string, attributes: [.font: font]))
-        let candidate = NSAttributedString(
-            string: completion.text,
-            attributes: [.font: font, .foregroundColor: NSColor.white.withAlphaComponent(0.36)]
-        )
-        document.insert(candidate, at: completion.start)
-        let storage = NSTextStorage(attributedString: document)
-        let manager = NSLayoutManager()
-        let scratchContainer = NSTextContainer(size: container.containerSize)
-        scratchContainer.lineFragmentPadding = container.lineFragmentPadding
-        scratchContainer.widthTracksTextView = container.widthTracksTextView
-        manager.addTextContainer(scratchContainer)
-        storage.addLayoutManager(manager)
-        let redrawRange = NSRange(location: completion.start, length: document.length - completion.start)
-        manager.ensureLayout(for: scratchContainer)
-        let glyphRange = manager.glyphRange(forCharacterRange: redrawRange, actualCharacterRange: nil)
-        let startGlyph = manager.glyphIndexForCharacter(at: completion.start)
-        let start = startGlyph < manager.numberOfGlyphs
-            ? manager.location(forGlyphAt: startGlyph)
-            : manager.extraLineFragmentRect.origin
-        let redrawRect = NSRect(
-            x: start.x + textContainerInset.width,
-            y: start.y + textContainerInset.height,
-            width: bounds.maxX - start.x,
-            height: bounds.maxY - start.y
-        )
-        if let context = NSGraphicsContext.current {
-            context.saveGraphicsState()
-            context.compositingOperation = .clear
-            redrawRect.fill()
-            context.restoreGraphicsState()
-        }
-        manager.drawGlyphs(
-            forGlyphRange: glyphRange,
-            at: NSPoint(x: textContainerInset.width, y: textContainerInset.height)
-        )
     }
 
     private func drawPlaceholderIfNeeded() {
@@ -386,12 +319,8 @@ final class CueTextView: NSTextView {
     override func keyDown(with event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let isReturn = event.keyCode == 36 || event.keyCode == 76
-        if event.keyCode == inlineCompletionAcceptShortcut.keyCode, flags == inlineCompletionAcceptShortcut.modifierFlags, !hasMarkedText(), onAcceptInlineCompletion?() == true { return }
-        let triggerShortcutMatches = event.keyCode == inlineCompletionTriggerShortcut.keyCode && flags == inlineCompletionTriggerShortcut.modifierFlags
-        if triggerShortcutMatches, !hasMarkedText(), onRequestInlineCompletion?() == true { return }
         let expansionShortcutMatches = event.keyCode == promptExpansionShortcut.keyCode && flags == promptExpansionShortcut.modifierFlags
         if expansionShortcutMatches, !hasMarkedText() { onExpandPrompt?(); return }
-        if event.keyCode == 53, !hasMarkedText(), onDismissInlineCompletion?() == true { return }
         let hasCommandWithOptionalShift = flags == .command || flags == [.command, .shift]
         if hasCommandWithOptionalShift, event.keyCode == 24, !hasMarkedText() {
             onAdjustEditorFontSize?(1)

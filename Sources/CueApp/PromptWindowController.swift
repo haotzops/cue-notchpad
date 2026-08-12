@@ -32,6 +32,7 @@ final class PromptWindowController: NSWindowController {
         settings: CueSettings,
         screen: NSScreen,
         sourceName: String?,
+        piMessage: String?,
         completion: @escaping (CueOutcome) -> Void
     ) {
         let screenGeometry = Self.geometry(for: screen)
@@ -42,7 +43,12 @@ final class PromptWindowController: NSWindowController {
         )
 
         CueUsageStore.shared.recordCueOpen()
-        self.presentation = PromptPresentation(model: model, sourceName: sourceName, sessionID: sessionID)
+        self.presentation = PromptPresentation(
+            model: model,
+            sourceName: sourceName,
+            sessionID: sessionID,
+            piMessage: piMessage
+        )
         self.settings = settings
         self.targetScreen = screen
         self.screenGeometry = screenGeometry
@@ -125,6 +131,7 @@ final class PromptWindowController: NSWindowController {
         model: PromptModel,
         sessionID: UUID,
         sourceName: String?,
+        piMessage: String?,
         index: Int,
         count: Int,
         direction: Int,
@@ -139,6 +146,7 @@ final class PromptWindowController: NSWindowController {
             model: model,
             sourceName: sourceName,
             sessionID: sessionID,
+            piMessage: piMessage,
             index: index,
             count: count,
             direction: direction,

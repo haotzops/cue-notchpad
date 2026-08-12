@@ -10,8 +10,8 @@ struct CueAISettingsView: View {
 
     var body: some View {
         modelAPIConfiguration
-        inlineCompletion
         promptRewrite
+        piIntegrationControls
     }
 
     private var modelAPIConfiguration: some View {
@@ -27,30 +27,30 @@ struct CueAISettingsView: View {
                 Button(settings.localized(.settingsRefreshModels)) {
                     settings.refreshDeepSeekModelsIfPossible()
                 }
-                .disabled(!settings.inlineCompletionKeyConfigured || settings.isLoadingInlineCompletionModels)
+                .disabled(!settings.deepSeekKeyConfigured || settings.isLoadingDeepSeekModels)
 
                 Button(settings.localized(.settingsHealthCheck)) {
                     settings.checkDeepSeekServiceHealth()
                 }
-                .disabled(!settings.inlineCompletionKeyConfigured || settings.isTestingInlineCompletionConnection)
+                .disabled(!settings.deepSeekKeyConfigured || settings.isTestingDeepSeekConnection)
 
                 Button(settings.localized(.settingsRemoveAPIKey)) {
                     settings.removeDeepSeekAPIKey()
                 }
-                .disabled(!settings.inlineCompletionKeyConfigured)
+                .disabled(!settings.deepSeekKeyConfigured)
             }
-            Text(settings.inlineCompletionKeyConfigured
+
+            Text(settings.deepSeekKeyConfigured
                 ? settings.localized(.settingsAPIKeyConfigured)
                 : settings.localized(.settingsAPIKeyNotConfigured)
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
 
-            if let status = settings.inlineCompletionStatus {
+            if let status = settings.deepSeekStatus {
                 HStack(spacing: 6) {
-                    if settings.isTestingInlineCompletionConnection {
-                        ProgressView()
-                            .controlSize(.small)
+                    if settings.isTestingDeepSeekConnection {
+                        ProgressView().controlSize(.small)
                     }
                     Text(status.message)
                 }
@@ -60,87 +60,33 @@ struct CueAISettingsView: View {
         }
     }
 
-    private var inlineCompletion: some View {
-        Section(settings.localized(.settingsFIM)) {
-            piIntegrationControls
-
-            Toggle(settings.localized(.settingsInlineCompletion), isOn: $settings.inlineCompletionEnabled)
-                .disabled(!settings.piIntegrationInstalled)
-
-            if !settings.piIntegrationInstalled {
-                Text(settings.localized(.settingsPiIntegrationRequired))
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+    private var promptRewrite: some View {
+        Section(settings.localized(.settingsAIRewrite)) {
+            Picker(settings.localized(.settingsModel), selection: $settings.promptExpansionModel) {
+                Text(settings.localized(.settingsChooseModel)).tag(String?.none)
+                ForEach(settings.deepSeekModels, id: \.self) {
+                    Text($0).tag(Optional($0))
+                }
             }
+            .disabled(!settings.deepSeekKeyConfigured)
+
             VStack(alignment: .leading, spacing: 6) {
-                Text(settings.localized(.settingsInlineCompletionHint))
+                Text(settings.localized(.settingsRewritePrompt))
+                TextEditor(text: $settings.promptExpansionInstruction)
+                    .font(.body)
+                    .frame(minHeight: 96)
+                Text(settings.localized(.settingsRewritePromptHint))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-
-                HStack {
-                    Picker(
-                        settings.localized(.settingsInlineCompletionModel),
-                        selection: $settings.inlineCompletionModel
-                    ) {
-                        Text(settings.localized(.settingsChooseModel)).tag(String?.none)
-                        ForEach(settings.inlineCompletionModels, id: \.self) { model in
-                            Text(model).tag(Optional(model))
-                        }
-                    }
-                    .disabled(!settings.inlineCompletionKeyConfigured || settings.isLoadingInlineCompletionModels)
-
-                    if settings.isLoadingInlineCompletionModels {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-
-                    Button(settings.localized(.settingsTestFIM)) {
-                        settings.testDeepSeekFIM()
-                    }
-                    .disabled(
-                        !settings.inlineCompletionKeyConfigured
-                            || settings.inlineCompletionModel == nil
-                            || settings.isTestingInlineCompletionConnection
-                    )
-                }
-
-                Picker(settings.localized(.settingsTriggerMode), selection: $settings.inlineCompletionTriggerMode) {
-                    Text(settings.localized(.settingsTriggerAutomatic)).tag(InlineCompletionTriggerMode.automatic)
-                    Text(settings.localized(.settingsTriggerManual)).tag(InlineCompletionTriggerMode.manual)
-                }
-
-                if settings.inlineCompletionTriggerMode != .manual {
-                    HStack {
-                        Text(settings.localized(.settingsTriggerDelay))
-                        TextField(
-                            settings.localized(.unitMilliseconds),
-                            value: $settings.inlineCompletionDelayMilliseconds,
-                            format: .number.precision(.fractionLength(0))
-                        )
-                        .frame(width: 72)
-                        Text(settings.localized(.unitMilliseconds))
-                    }
-                }
-
-                HStack(spacing: 8) {
-                    Text(settings.localized(.settingsMaximumLines))
-                    Spacer()
-                    Text("\(settings.inlineCompletionMaximumLines)")
-                        .monospacedDigit()
-                        .frame(minWidth: 18, alignment: .trailing)
-                    Stepper(
-                        "",
-                        value: $settings.inlineCompletionMaximumLines,
-                        in: 1 ... CueSettings.maximumInlineCompletionLines
-                    )
-                        .labelsHidden()
-                }
+                Text(settings.localized(.settingsRewriteMessageVariableHint))
+                    .font(.system(.footnote, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
     private var piIntegrationControls: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Section(settings.localized(.settingsPiIntegration)) {
             LabeledContent(settings.localized(.settingsPiIntegration)) {
                 Text(piIntegrationStatusText)
                     .font(.footnote)
@@ -192,6 +138,10 @@ struct CueAISettingsView: View {
                     .foregroundStyle(.red)
             }
 
+            Text(settings.localized(.settingsPiIntegrationRewriteHint))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(settings.localized(.settingsPiIntegrationExternalEditorHint))
                     .font(.footnote)
@@ -242,28 +192,6 @@ struct CueAISettingsView: View {
         case .installed: .green
         case .needsRepair, .foreign: .red
         case .notInstalled: .secondary
-        }
-    }
-
-    private var promptRewrite: some View {
-        Section(settings.localized(.settingsAIRewrite)) {
-            Picker(settings.localized(.settingsInlineCompletionModel), selection: $settings.promptExpansionModel) {
-                Text(settings.localized(.settingsChooseModel)).tag(String?.none)
-                ForEach(settings.inlineCompletionModels, id: \.self) {
-                    Text($0).tag(Optional($0))
-                }
-            }
-            .disabled(!settings.inlineCompletionKeyConfigured)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(settings.localized(.settingsRewritePrompt))
-                TextEditor(text: $settings.promptExpansionInstruction)
-                    .font(.body)
-                    .frame(minHeight: 72)
-                Text(settings.localized(.settingsRewritePromptHint))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 }

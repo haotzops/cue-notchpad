@@ -9,19 +9,6 @@ struct CueShortcutSettingsView: View {
             shortcutRow(settings.localized(.shortcutToggle), shortcut: $settings.toggleShortcut)
             shortcutRow(settings.localized(.shortcutPrevious), shortcut: $settings.previousShortcut)
             shortcutRow(settings.localized(.shortcutNext), shortcut: $settings.nextShortcut)
-            shortcutRow(
-                settings.localized(.settingsManualCompletion),
-                shortcut: $settings.inlineCompletionShortcut,
-                allowsUnmodifiedKeys: true
-            )
-            LabeledContent(settings.localized(.settingsAcceptCompletion)) {
-                CueShortcutRecorder(
-                    shortcut: $settings.inlineCompletionAcceptShortcut,
-                    recordingPrompt: settings.localized(.shortcutRecord),
-                    allowsUnmodifiedKeys: true
-                )
-                .frame(width: 110, height: 24)
-            }
             shortcutRow(settings.localized(.settingsAIRewrite), shortcut: $settings.promptExpansionShortcut)
         }
     }

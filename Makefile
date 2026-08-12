@@ -17,6 +17,7 @@ build-release: tokenizer
 	swift build -c release
 
 test: tokenizer
+	node --experimental-strip-types --test Tests/PiIntegration/index.test.mjs
 	swift run cue-tests
 
 app: tokenizer

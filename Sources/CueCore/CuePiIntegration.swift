@@ -31,13 +31,14 @@ public enum CuePiIntegrationError: LocalizedError, Equatable {
 public final class CuePiIntegrationService: @unchecked Sendable {
     public static let shared = CuePiIntegrationService()
     public static let extensionName = "pi-cue-context"
-    public static let integrationVersion = 1
+    public static let integrationVersion = 2
     static let manifestSchemaVersion = 1
     static let manifestFileName = "manifest.json"
     static let extensionFileName = "index.ts"
     static let resourceSubdirectory = "PiIntegration/pi-cue-context"
     static let managedFileNames: Set<String> = [extensionFileName]
     static let managedFileNamesByVersion: [Int: Set<String>] = [
+        1: managedFileNames,
         integrationVersion: managedFileNames,
     ]
 

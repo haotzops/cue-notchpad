@@ -203,24 +203,6 @@ for localization in ["en", "zh-Hans"] {
         )
     }
 }
-expect(
-    String(
-        format: CueLocalization.string(.fimUsage,  localization: "en"),
-        locale: Locale(identifier: "en_US_POSIX"),
-        Int64(12),
-        Int64(34)
-    ) == "FIM: 12/34",
-    "English FIM usage format"
-)
-expect(
-    String(
-        format: CueLocalization.string(.fimUsage,  localization: "zh-Hans"),
-        locale: Locale(identifier: "zh_Hans_CN"),
-        Int64(12),
-        Int64(34)
-    ) == "FIM：12/34",
-    "Simplified Chinese FIM usage format"
-)
 
 let spacingVectors: [(String, String)] = [
     ("中文English", "中文 English"),
@@ -241,46 +223,59 @@ for (input, expected) in spacingVectors {
     )
 }
 
-let inlineDocument = "你好 👨‍👩‍👧‍👦hello世界"
-let inlineCaret = NSRange(location: ("你好 👨‍👩‍👧‍👦hello" as NSString).length, length: 0)
-let inlineContext = InlineCompletionContextBuilder.make(document: inlineDocument, selection: inlineCaret)
-expect(inlineContext?.prefix == "你好 👨‍👩‍👧‍👦hello", "inline completion prefix preserves grapheme clusters")
-expect(inlineContext?.suffix == "世界", "inline completion suffix")
-expect(InlineCompletionContextBuilder.make(document: inlineDocument, selection: NSRange(location: 1, length: 1)) == nil, "inline completion rejects selected text")
-
-let fimRequest = DeepSeekFIMRequest(model: "deepseek-v4-pro", prompt: "before", suffix: "after")
-if let encodedRequest = try? JSONEncoder().encode(fimRequest),
-   let requestObject = try? JSONSerialization.jsonObject(with: encodedRequest) as? [String: Any]
-{
-    expect(requestObject["max_tokens"] as? Int == DeepSeekFIM.defaultMaximumTokens, "FIM request max_tokens encoding")
-    expect(requestObject["stream"] as? Bool == true, "FIM request streaming encoding")
-    expect((requestObject["stream_options"] as? [String: Any])?["include_usage"] as? Bool == true, "FIM usage stream option")
-} else {
-    expect(false, "FIM request should encode")
-}
-let clampedFIMRequest = DeepSeekFIMRequest(model: "user-selected-model", prompt: "a", suffix: "", maxTokens: 9_999)
-expect(clampedFIMRequest.model == "user-selected-model", "FIM request preserves the user-selected model")
-expect(clampedFIMRequest.maxTokens == DeepSeekFIM.maximumTokens, "FIM request limits max_tokens to the documented maximum")
+expect(
+    PromptRewriteTemplate.render("Before\n${message}\nAfter", message: "agent turn")
+        == "Before\nagent turn\nAfter",
+    "rewrite template inserts the Pi message at an arbitrary position"
+)
+expect(
+    PromptRewriteTemplate.render("${message} / ${message}", message: "reply") == "reply / reply",
+    "rewrite template replaces every message variable"
+)
+expect(
+    PromptRewriteTemplate.render("No context variable", message: "must not be injected")
+        == "No context variable",
+    "rewrite template does not inject Pi context without an explicit variable"
+)
+expect(
+    PromptRewriteTemplate.render("Context: ${message}", message: nil) == "Context: ",
+    "missing Pi context expands safely to an empty string"
+)
 
 let modelsJSON = """
-{"object":"list","data":[{"id":"deepseek-v4-pro","object":"model","owned_by":"deepseek"}]}
+{"object":"list","data":[{"id":"deepseek-chat","object":"model","owned_by":"deepseek"}]}
 """
 if let modelList = try? JSONDecoder().decode(DeepSeekModelList.self, from: Data(modelsJSON.utf8)) {
-    expect(modelList.data.map(\.id) == ["deepseek-v4-pro"], "DeepSeek model list decoding")
+    expect(modelList.data.map(\.id) == ["deepseek-chat"], "DeepSeek model list decoding")
 } else {
     expect(false, "DeepSeek model list should decode")
 }
 
-var sseParser = DeepSeekFIMSSEParser()
+let piContext = PiRewriteContext(
+    version: PiSessionBridge.protocolVersion,
+    sessionID: "session-1",
+    leafID: "leaf-1",
+    message: "latest agent turn"
+)
+expect(piContext.isValid, "bounded current Pi rewrite context is valid")
+expect(
+    !PiRewriteContext(version: PiSessionBridge.protocolVersion + 1, sessionID: "session", leafID: nil, message: "text").isValid,
+    "future Pi bridge protocol is rejected"
+)
+let attachedRequest = CueSessionRequest(
+    initialText: "draft",
+    document: .standardInput,
+    callerPID: 1,
+    callerName: "Pi",
+    workingDirectory: "/tmp",
+    piRewriteContext: piContext
+)
 do {
-    let partialEvents = try sseParser.append(Data("data: {\"choices\":[{\"text\":\"hel".utf8))
-    expect(partialEvents.isEmpty, "SSE partial event waits for terminator")
-    let events = try sseParser.append(Data("lo\",\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n".utf8))
-    expect(events == ["{\"choices\":[{\"text\":\"hello\",\"finish_reason\":\"stop\"}]}", "[DONE]"], "SSE parser combines chunked events")
-    let chunk = try JSONDecoder().decode(DeepSeekFIMStreamChunk.self, from: Data(events[0].utf8))
-    expect(chunk.choices.first?.finishReason == "stop", "SSE chunk decodes finish reason")
+    let encoded = try JSONEncoder().encode(attachedRequest)
+    let decoded = try JSONDecoder().decode(CueSessionRequest.self, from: encoded)
+    expect(decoded.piRewriteContext == piContext, "Cue IPC preserves the session-scoped Pi rewrite context")
 } catch {
-    expect(false, "SSE parser should parse: \(error)")
+    expect(false, "Cue IPC should encode Pi rewrite context: \(error)")
 }
 
 let tokenCounter = CL100KTokenCounter.shared
@@ -522,9 +517,8 @@ private func runAppTests() async {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(try fixtureData(named: "usage-v1.json"), forKey: CueUsageStore.archiveKey)
         let usage = CueUsageStore(defaults: defaults)
-        expect(usage.records.count == 1, "usage fixture is readable")
+        expect(usage.records.count == 1, "legacy FIM usage fixture remains readable")
         expect(usage.records.first?.totalTokens == 46, "usage fixture token total")
-        usage.recordCompletionRequest(model: "new-model")
 
         let storedData = defaults.data(forKey: CueUsageStore.archiveKey) ?? Data()
         let stored = try JSONSerialization.jsonObject(with: storedData) as? [String: Any]
@@ -559,6 +553,44 @@ private func runAppTests() async {
                 "\(fixture) remains read-only"
             )
         }
+
+        let activityDocument: [String: Any] = [
+            "schemaVersion": CueUsageStore.schemaVersion,
+            "records": [],
+            "cueOpenCount": 3,
+            "cueOpenDates": [0.0, 3_600.0, 86_400.0],
+        ]
+        defaults.set(
+            try JSONSerialization.data(withJSONObject: activityDocument),
+            forKey: CueUsageStore.archiveKey
+        )
+        let activityStore = CueUsageStore(defaults: defaults)
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let activityStart = Date(timeIntervalSinceReferenceDate: 0)
+        let activity = activityStore.activity(
+            from: activityStart,
+            through: activityStart.addingTimeInterval(2 * 86_400),
+            calendar: utcCalendar
+        )
+        expect(activity.totalOpens == 3, "usage activity counts opens in the selected range")
+        expect(activity.activeDays == 2, "usage activity deduplicates active days")
+        expect(activity.dayCount == 3, "usage activity includes both boundary days")
+        expect(activity.averageOpens == 1, "usage activity averages over selected days")
+        expect(activity.buckets.map(\.opens) == [2, 1, 0], "multi-day activity uses daily buckets")
+        let hourlyActivity = activityStore.activity(
+            from: activityStart,
+            through: activityStart.addingTimeInterval(3 * 3_600),
+            calendar: utcCalendar
+        )
+        expect(hourlyActivity.buckets.count == 4, "single-day activity uses hourly buckets")
+        expect(hourlyActivity.buckets.map(\.opens) == [1, 1, 0, 0], "hourly activity counts each open")
+        let longActivity = activityStore.activity(
+            from: activityStart,
+            through: activityStart.addingTimeInterval(89 * 86_400),
+            calendar: utcCalendar
+        )
+        expect(longActivity.buckets.count <= 30, "long activity ranges use at most thirty buckets")
     } catch {
         expect(false, "usage persistence tests should not throw: \(error)")
     }
@@ -567,12 +599,19 @@ private func runAppTests() async {
     let englishDefaults = UserDefaults(suiteName: englishSuite)!
     defer { englishDefaults.removePersistentDomain(forName: englishSuite) }
     englishDefaults.set(CueLanguage.english.rawValue, forKey: "language")
+    englishDefaults.set(true, forKey: "inlineCompletionEnabled")
+    englishDefaults.set("legacy-model", forKey: "inlineCompletionModel")
     let english = CueSettings(defaults: englishDefaults)
-    expect(english.inlineCompletionTriggerMode == .manual, "settings use the registered trigger default")
     expect(
         english.promptExpansionInstruction
             == CueLocalization.string(.settingsAIRewriteDefaultPrompt, localization: "en"),
         "English settings use the English rewrite prompt"
+    )
+    english.restoreAllSettings()
+    expect(
+        englishDefaults.bool(forKey: "inlineCompletionEnabled")
+            && englishDefaults.string(forKey: "inlineCompletionModel") == "legacy-model",
+        "removing FIM keeps legacy user-owned settings keys untouched"
     )
 
     let chineseSuite = "cue-settings-zh-\(UUID().uuidString)"

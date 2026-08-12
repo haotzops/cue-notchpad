@@ -19,13 +19,6 @@ enum CueLanguage: String, CaseIterable, Identifiable {
     }
 }
 
-enum InlineCompletionTriggerMode: String, CaseIterable, Identifiable {
-    case automatic
-    case manual
-
-    var id: String { rawValue }
-}
-
 enum CueOverflowBehavior: String, CaseIterable, Identifiable {
     case scrollable
     case growWithContent
@@ -33,7 +26,7 @@ enum CueOverflowBehavior: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-struct InlineCompletionStatus: Equatable {
+struct AIServiceStatus: Equatable {
     enum Style: Equatable {
         case information
         case error
@@ -54,11 +47,6 @@ final class CueSettings: ObservableObject {
     static let persistenceSchemaVersion = 1
     static let minimumEditorFontSize = 8.0
     static let maximumEditorFontSize = 72.0
-    static let defaultInlineCompletionDelayMilliseconds = 200.0
-    static let maximumInlineCompletionDelayMilliseconds = 5_000.0
-    static let defaultInlineCompletionMaximumLines = 1
-    static let maximumInlineCompletionLines = 100
-
     private let defaults: UserDefaults
     private let deepSeekService: any DeepSeekService
     private let piIntegrationService: CuePiIntegrationService
@@ -113,33 +101,6 @@ final class CueSettings: ObservableObject {
         didSet { defaults.set(insertsSpacesBetweenChineseAndEnglish, forKey: Keys.insertsSpacesBetweenChineseAndEnglish) }
     }
 
-    @Published var inlineCompletionEnabled: Bool {
-        didSet {
-            defaults.set(inlineCompletionEnabled, forKey: Keys.inlineCompletionEnabled)
-            if inlineCompletionEnabled { refreshDeepSeekModelsIfPossible() }
-        }
-    }
-
-    @Published var inlineCompletionTriggerMode: InlineCompletionTriggerMode {
-        didSet { defaults.set(inlineCompletionTriggerMode.rawValue, forKey: Keys.inlineCompletionTriggerMode) }
-    }
-    @Published var inlineCompletionDelayMilliseconds: Double {
-        didSet {
-            defaults.set(
-                min(max(inlineCompletionDelayMilliseconds, 0), Self.maximumInlineCompletionDelayMilliseconds),
-                forKey: Keys.inlineCompletionDelayMilliseconds
-            )
-        }
-    }
-    @Published var inlineCompletionMaximumLines: Int {
-        didSet {
-            defaults.set(
-                min(max(inlineCompletionMaximumLines, 1), Self.maximumInlineCompletionLines),
-                forKey: Keys.inlineCompletionMaximumLines
-            )
-        }
-    }
-
     @Published var promptExpansionModel: String? {
         didSet { defaults.set(promptExpansionModel, forKey: Keys.promptExpansionModel) }
     }
@@ -147,20 +108,11 @@ final class CueSettings: ObservableObject {
         didSet { defaults.set(promptExpansionInstruction, forKey: Keys.promptExpansionInstruction) }
     }
 
-    @Published var inlineCompletionModel: String? {
-        didSet {
-            if let inlineCompletionModel {
-                defaults.set(inlineCompletionModel, forKey: Keys.inlineCompletionModel)
-            } else {
-                defaults.removeObject(forKey: Keys.inlineCompletionModel)
-            }
-        }
-    }
-    @Published private(set) var inlineCompletionModels = [String]()
-    @Published private(set) var isLoadingInlineCompletionModels = false
-    @Published private(set) var isTestingInlineCompletionConnection = false
-    @Published var inlineCompletionKeyConfigured = false
-    @Published private(set) var inlineCompletionStatus: InlineCompletionStatus?
+    @Published private(set) var deepSeekModels = [String]()
+    @Published private(set) var isLoadingDeepSeekModels = false
+    @Published private(set) var isTestingDeepSeekConnection = false
+    @Published var deepSeekKeyConfigured = false
+    @Published private(set) var deepSeekStatus: AIServiceStatus?
 
     @Published private(set) var piIntegrationState: PiIntegrationState = .notInstalled
     @Published private(set) var piIntegrationErrorMessage: String?
@@ -173,12 +125,6 @@ final class CueSettings: ObservableObject {
     }
     @Published var nextShortcut: CueShortcut {
         didSet { save(nextShortcut, key: Keys.nextShortcut) }
-    }
-    @Published var inlineCompletionShortcut: CueShortcut {
-        didSet { save(inlineCompletionShortcut, key: Keys.inlineCompletionShortcut) }
-    }
-    @Published var inlineCompletionAcceptShortcut: CueShortcut {
-        didSet { save(inlineCompletionAcceptShortcut, key: Keys.inlineCompletionAcceptShortcut) }
     }
     @Published var promptExpansionShortcut: CueShortcut {
         didSet { save(promptExpansionShortcut, key: Keys.promptExpansionShortcut) }
@@ -220,20 +166,13 @@ final class CueSettings: ObservableObject {
         overflowBehavior = .scrollable
         restoreDefaultEditorFont()
         insertsSpacesBetweenChineseAndEnglish = false
-        inlineCompletionEnabled = false
-        inlineCompletionTriggerMode = .manual
-        inlineCompletionDelayMilliseconds = Self.defaultInlineCompletionDelayMilliseconds
-        inlineCompletionMaximumLines = Self.defaultInlineCompletionMaximumLines
-        inlineCompletionModel = nil
         promptExpansionModel = nil
         promptExpansionInstruction = localizedDefaultPromptInstruction()
         toggleShortcut = .toggleDefault
         previousShortcut = .previousDefault
         nextShortcut = .nextDefault
-        inlineCompletionShortcut = .inlineCompletionDefault
-        inlineCompletionAcceptShortcut = .inlineCompletionAcceptDefault
         promptExpansionShortcut = .promptExpansionDefault
-        inlineCompletionStatus = nil
+        deepSeekStatus = nil
     }
 
     private func localizedDefaultPromptInstruction() -> String {
@@ -253,7 +192,7 @@ final class CueSettings: ObservableObject {
 
     init(
         defaults: UserDefaults = .standard,
-        deepSeekService: any DeepSeekService = DeepSeekFIMCompletionProvider(),
+        deepSeekService: any DeepSeekService = DeepSeekChatService(),
         piIntegrationService: CuePiIntegrationService = .shared
     ) {
         self.defaults = defaults
@@ -270,10 +209,6 @@ final class CueSettings: ObservableObject {
             Keys.editorFontName: Self.defaultEditorFont.fontName,
             Keys.editorFontSize: Self.defaultEditorFontSize,
             Keys.insertsSpacesBetweenChineseAndEnglish: false,
-            Keys.inlineCompletionEnabled: false,
-            Keys.inlineCompletionTriggerMode: InlineCompletionTriggerMode.manual.rawValue,
-            Keys.inlineCompletionDelayMilliseconds: Self.defaultInlineCompletionDelayMilliseconds,
-            Keys.inlineCompletionMaximumLines: Self.defaultInlineCompletionMaximumLines,
         ])
 
         let selectedLanguage = CueLanguage(
@@ -291,25 +226,12 @@ final class CueSettings: ObservableObject {
         let storedFontSize = defaults.double(forKey: Keys.editorFontSize)
         editorFontSize = min(max(storedFontSize, Self.minimumEditorFontSize), Self.maximumEditorFontSize)
         insertsSpacesBetweenChineseAndEnglish = defaults.bool(forKey: Keys.insertsSpacesBetweenChineseAndEnglish)
-        inlineCompletionEnabled = defaults.bool(forKey: Keys.inlineCompletionEnabled)
-        inlineCompletionTriggerMode = InlineCompletionTriggerMode(
-            rawValue: defaults.string(forKey: Keys.inlineCompletionTriggerMode) ?? InlineCompletionTriggerMode.manual.rawValue
-        ) ?? .manual
-        inlineCompletionDelayMilliseconds = min(
-            max(defaults.double(forKey: Keys.inlineCompletionDelayMilliseconds), 0),
-            Self.maximumInlineCompletionDelayMilliseconds
-        )
-        inlineCompletionMaximumLines = min(
-            max(defaults.integer(forKey: Keys.inlineCompletionMaximumLines), 1),
-            Self.maximumInlineCompletionLines
-        )
         promptExpansionModel = defaults.string(forKey: Keys.promptExpansionModel)
         // A stored instruction is user data, including a prior default that a
         // user may have edited; never replace it during an application update.
         promptExpansionInstruction = defaults.string(forKey: Keys.promptExpansionInstruction)
             ?? Self.defaultPromptInstruction(for: selectedLanguage)
-        inlineCompletionModel = defaults.string(forKey: Keys.inlineCompletionModel)
-        inlineCompletionKeyConfigured = (try? CueAPIKeyStore.loadDeepSeekAPIKey()) != nil
+        deepSeekKeyConfigured = (try? CueAPIKeyStore.loadDeepSeekAPIKey()) != nil
         toggleShortcut = Self.loadShortcut(
             from: defaults,
             key: Keys.toggleShortcut,
@@ -325,28 +247,13 @@ final class CueSettings: ObservableObject {
             key: Keys.nextShortcut,
             fallback: .nextDefault
         )
-        inlineCompletionShortcut = Self.loadShortcut(
-            from: defaults,
-            key: Keys.inlineCompletionShortcut,
-            fallback: .inlineCompletionDefault
-        )
-        inlineCompletionAcceptShortcut = Self.loadShortcut(
-            from: defaults,
-            key: Keys.inlineCompletionAcceptShortcut,
-            fallback: .inlineCompletionAcceptDefault
-        )
         promptExpansionShortcut = Self.loadShortcut(
             from: defaults,
             key: Keys.promptExpansionShortcut,
             fallback: .promptExpansionDefault
         )
         piIntegrationState = piIntegrationService.state()
-        if inlineCompletionEnabled { refreshDeepSeekModelsIfPossible() }
-    }
-
-    var piIntegrationInstalled: Bool {
-        if case .installed = piIntegrationState { return true }
-        return false
+        if deepSeekKeyConfigured { refreshDeepSeekModelsIfPossible() }
     }
 
     var piIntegrationDirectoryPath: String {
@@ -382,88 +289,63 @@ final class CueSettings: ObservableObject {
     func saveDeepSeekAPIKey(_ key: String) {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            setInlineCompletionStatus(.settingsAPIKeyMissing, style: .error)
+            setDeepSeekStatus(.settingsAPIKeyMissing, style: .error)
             return
         }
         do {
             try CueAPIKeyStore.saveDeepSeekAPIKey(trimmed)
-            inlineCompletionKeyConfigured = true
-            setInlineCompletionStatus(.settingsAPIKeySaved)
+            deepSeekKeyConfigured = true
+            setDeepSeekStatus(.settingsAPIKeySaved)
             refreshDeepSeekModelsIfPossible()
         } catch {
-            setInlineCompletionStatus(error.localizedDescription, style: .error)
-        }
-    }
-
-    func testDeepSeekFIM() {
-        guard let apiKey = try? CueAPIKeyStore.loadDeepSeekAPIKey() else {
-            setInlineCompletionStatus(.settingsAPIKeyMissing, style: .error)
-            return
-        }
-        guard let model = inlineCompletionModel else {
-            setInlineCompletionStatus(.settingsModelMissing, style: .error)
-            return
-        }
-        guard !isTestingInlineCompletionConnection else { return }
-
-        isTestingInlineCompletionConnection = true
-        setInlineCompletionStatus(.settingsTestingAPIKey)
-        Task { @MainActor [weak self] in
-            defer { self?.isTestingInlineCompletionConnection = false }
-            do {
-                guard let service = self?.deepSeekService else { return }
-                try await service.validate(apiKey: apiKey, model: model)
-                self?.setInlineCompletionStatus(.settingsFIMAvailable)
-            } catch {
-                self?.setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
-            }
+            setDeepSeekStatus(error.localizedDescription, style: .error)
         }
     }
 
     func checkDeepSeekServiceHealth() {
         guard let apiKey = try? CueAPIKeyStore.loadDeepSeekAPIKey(),
-              !isTestingInlineCompletionConnection
+              !isTestingDeepSeekConnection
         else {
-            if inlineCompletionKeyConfigured == false {
-                setInlineCompletionStatus(.settingsAPIKeyMissing, style: .error)
+            if !deepSeekKeyConfigured {
+                setDeepSeekStatus(.settingsAPIKeyMissing, style: .error)
             }
             return
         }
 
-        isTestingInlineCompletionConnection = true
-        setInlineCompletionStatus(.settingsCheckingServiceHealth)
+        isTestingDeepSeekConnection = true
+        setDeepSeekStatus(.settingsCheckingServiceHealth)
         Task { @MainActor [weak self] in
-            defer { self?.isTestingInlineCompletionConnection = false }
+            defer { self?.isTestingDeepSeekConnection = false }
             do {
                 guard let service = self?.deepSeekService else { return }
                 _ = try await service.availableModels(apiKey: apiKey)
-                self?.setInlineCompletionStatus(.settingsServiceHealthy)
+                self?.setDeepSeekStatus(.settingsServiceHealthy)
             } catch {
-                self?.setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
+                self?.setDeepSeekStatus(.settingsAIRewriteUnavailable, style: .error)
             }
         }
     }
 
     func refreshDeepSeekModelsIfPossible() {
-        guard let apiKey = try? CueAPIKeyStore.loadDeepSeekAPIKey(), !isLoadingInlineCompletionModels else { return }
-        isLoadingInlineCompletionModels = true
-        setInlineCompletionStatus(.settingsLoadingModels)
+        guard let apiKey = try? CueAPIKeyStore.loadDeepSeekAPIKey(), !isLoadingDeepSeekModels else { return }
+        isLoadingDeepSeekModels = true
+        setDeepSeekStatus(.settingsLoadingModels)
         Task { @MainActor [weak self] in
-            defer { self?.isLoadingInlineCompletionModels = false }
+            defer { self?.isLoadingDeepSeekModels = false }
             do {
                 guard let service = self?.deepSeekService else { return }
                 let models = try await service.availableModels(apiKey: apiKey)
                 guard !models.isEmpty else {
-                    self?.setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
+                    self?.setDeepSeekStatus(.settingsAIRewriteUnavailable, style: .error)
                     return
                 }
-                self?.inlineCompletionModels = models
-                if let self, let selectedModel = self.inlineCompletionModel, !models.contains(selectedModel) {
-                    self.inlineCompletionModel = nil
+                self?.deepSeekModels = models
+                if let self, let selectedModel = self.promptExpansionModel, !models.contains(selectedModel) {
+                    self.promptExpansionModel = nil
                 }
-                self?.inlineCompletionStatus = nil
+                self?.deepSeekStatus = nil
             } catch {
-                self?.setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
+                self?.setDeepSeekStatus(.settingsAIRewriteUnavailable, style: .error)
             }
         }
     }
@@ -471,13 +353,11 @@ final class CueSettings: ObservableObject {
     func removeDeepSeekAPIKey() {
         do {
             try CueAPIKeyStore.removeDeepSeekAPIKey()
-            inlineCompletionKeyConfigured = false
-            inlineCompletionEnabled = false
-            inlineCompletionModel = nil
-            inlineCompletionModels = []
-            setInlineCompletionStatus(.settingsAPIKeyRemoved)
+            deepSeekKeyConfigured = false
+            deepSeekModels = []
+            setDeepSeekStatus(.settingsAPIKeyRemoved)
         } catch {
-            setInlineCompletionStatus(error.localizedDescription, style: .error)
+            setDeepSeekStatus(error.localizedDescription, style: .error)
         }
     }
 
@@ -485,41 +365,41 @@ final class CueSettings: ObservableObject {
         CueLocalization.string(key, localization: language.localizationIdentifier)
     }
 
-    func reportInlineCompletionFailure(_ key: CueLocalizedKey) {
-        setInlineCompletionStatus(key, style: .error)
-    }
-
-    func expandPrompt(_ text: String) async throws -> String? {
+    func expandPrompt(_ text: String, message: String?) async throws -> String? {
         guard let apiKey = try CueAPIKeyStore.loadDeepSeekAPIKey(),
               let model = promptExpansionModel
         else { return nil }
         do {
-            let expanded = try await deepSeekService.expandPrompt(
+            let instruction = PromptRewriteTemplate.render(
+                promptExpansionInstruction,
+                message: message
+            )
+            let result = try await deepSeekService.rewritePrompt(
                 text,
-                instruction: promptExpansionInstruction,
+                instruction: instruction,
                 model: model,
                 apiKey: apiKey
             )
-            inlineCompletionStatus = nil
-            return expanded
+            deepSeekStatus = nil
+            return result
         } catch {
-            setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
+            setDeepSeekStatus(.settingsAIRewriteUnavailable, style: .error)
             throw error
         }
     }
 
-    private func setInlineCompletionStatus(
+    private func setDeepSeekStatus(
         _ key: CueLocalizedKey,
-        style: InlineCompletionStatus.Style = .information
+        style: AIServiceStatus.Style = .information
     ) {
-        setInlineCompletionStatus(localized(key), style: style)
+        setDeepSeekStatus(localized(key), style: style)
     }
 
-    private func setInlineCompletionStatus(
+    private func setDeepSeekStatus(
         _ message: String,
-        style: InlineCompletionStatus.Style = .information
+        style: AIServiceStatus.Style = .information
     ) {
-        inlineCompletionStatus = InlineCompletionStatus(message: message, style: style)
+        deepSeekStatus = AIServiceStatus(message: message, style: style)
     }
 
     private func save(_ shortcut: CueShortcut, key: String) {
@@ -547,18 +427,11 @@ final class CueSettings: ObservableObject {
         static let editorFontName = "editorFontName"
         static let editorFontSize = "editorFontSize"
         static let insertsSpacesBetweenChineseAndEnglish = "insertsSpacesBetweenChineseAndEnglish"
-        static let inlineCompletionEnabled = "inlineCompletionEnabled"
-        static let inlineCompletionTriggerMode = "inlineCompletionTriggerMode"
-        static let inlineCompletionDelayMilliseconds = "inlineCompletionDelayMilliseconds"
-        static let inlineCompletionMaximumLines = "inlineCompletionMaximumLines"
         static let promptExpansionModel = "promptExpansionModel"
         static let promptExpansionInstruction = "promptExpansionInstruction"
-        static let inlineCompletionModel = "inlineCompletionModel"
         static let toggleShortcut = "toggleShortcut"
         static let previousShortcut = "previousShortcut"
         static let nextShortcut = "nextShortcut"
-        static let inlineCompletionShortcut = "inlineCompletionShortcut"
-        static let inlineCompletionAcceptShortcut = "inlineCompletionAcceptShortcut"
         static let promptExpansionShortcut = "promptExpansionShortcut"
     }
 }

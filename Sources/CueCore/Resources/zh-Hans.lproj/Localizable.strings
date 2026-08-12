@@ -19,6 +19,10 @@
 "settings.editor_font" = "编辑器字体";
 "settings.editor_font_size" = "编辑器字号";
 "settings.editor_font_size.hint" = "可在此处调整，或在编辑框中按 ⌘+ / ⌘-。";
+"settings.system_font_regular" = "系统字体常规体";
+"unit.points" = "pt";
+"language.english" = "英文";
+"language.simplified_chinese" = "简体中文";
 "settings.choose_font" = "选择…";
 "settings.restore_default_font" = "恢复默认编辑器字体";
 "settings.restore_default_window_size" = "恢复默认窗口大小";
@@ -34,13 +38,10 @@
 "settings.cancel" = "取消";
 "settings.chinese_english_spacing" = "提交时自动在中英文之间加空格";
 "settings.chinese_english_spacing.hint" = "在提交 prompt 时应用。";
-"settings.inline_completion" = "启用 DeepSeek 行间补全";
-"settings.inline_completion.hint" = "启用后，光标附近的 prompt 文本会发送至 DeepSeek FIM 以生成建议。按 Tab 接受建议。";
-"settings.inline_completion.model" = "模型";
+"settings.model" = "模型";
 "settings.refresh_models" = "刷新模型";
 "settings.loading_models" = "正在获取可用模型…";
 "settings.choose_model" = "请选择模型";
-"settings.model_missing" = "请先选择模型。";
 "settings.deepseek_api_key" = "DeepSeek API Key";
 "settings.save_api_key" = "保存 API Key";
 "settings.remove_api_key" = "移除 API Key";
@@ -49,21 +50,53 @@
 "settings.api_key_missing" = "请先输入 API Key。";
 "settings.api_key_saved" = "API Key 已保存到本地配置文件。";
 "settings.api_key_removed" = "API Key 已移除。";
-"settings.api_key_rejected" = "DeepSeek 拒绝了此 API Key。";
-"settings.inline_completion_rate_limited" = "DeepSeek 正在限制补全请求频率。";
-"settings.inline_completion_unavailable" = "行间补全暂时不可用。";
-"settings.test_api_key" = "测试连接";
+"settings.ai_rewrite_unavailable" = "AI 重写暂时不可用。";
 "settings.health_check" = "健康检测";
 "settings.checking_service_health" = "正在进行健康检测…";
 "settings.service_healthy" = "DeepSeek 服务可用。";
-"settings.test_fim" = "测试 FIM";
-"settings.testing_api_key" = "正在测试 API Key…";
-"settings.fim_available" = "FIM 请求成功。";
-"settings.api_key_valid" = "DeepSeek API Key 有效。";
 "settings.overflow_behavior" = "溢出行为";
 "settings.overflow.scrollable" = "可滚动窗口";
 "settings.overflow.grow" = "随行数增加";
 "settings.shortcuts" = "快捷键";
+"settings.page.general" = "通用";
+"settings.page.ai" = "AI";
+"settings.page.usage" = "使用统计";
+"settings.rewrite_prompt" = "重写提示词";
+"settings.rewrite_prompt.hint" = "修改会自动保存，并在下次重写时应用；当前编辑器文本始终作为 user message 发送。";
+"settings.rewrite_prompt.message_variable_hint" = "可在任意位置使用 ${message}，插入打开当前 Cue 窗口的 Pi 会话中最近一个 assistant turn。";
+"settings.model_api_configuration" = "模型 API 配置";
+"settings.pi_integration" = "Pi 集成";
+"settings.pi_integration.install" = "安装";
+"settings.pi_integration.repair" = "修复";
+"settings.pi_integration.uninstall" = "卸载";
+"settings.pi_integration.installed_format" = "已安装（v%lld）";
+"settings.pi_integration.not_installed" = "未安装";
+"settings.pi_integration.needs_repair" = "需要修复";
+"settings.pi_integration.foreign" = "外来目录";
+"settings.pi_integration.foreign_hint" = "该路径已存在目录但没有有效的 Cue manifest。Cue 不会修改或删除它；如为残留可手动移除。";
+"settings.pi_integration.path" = "路径：";
+"settings.pi_integration.rewrite_hint" = "Cue 由 Pi 打开时，集成只提供 active branch 上最近一个 assistant turn 的文本。该文本仅保存在内存中；只有重写提示词包含 ${message} 且你明确执行 AI 重写时，才会发送给 DeepSeek。";
+"settings.pi_integration.external_editor_hint" = "安装后，请配置 Pi 的 externalEditor（Cue 不会自动修改 Pi 设置）：";
+"settings.pi_integration.copy" = "复制";
+"settings.pi_integration.copied" = "已复制";
+"settings.pi_integration.uninstall_confirmation" = "这将从 Pi agent 目录移除由 Cue 管理的 Pi 集成扩展。";
+"settings.ai_rewrite" = "AI 重写";
+"settings.ai_rewrite.default_prompt" = "在不改变原意的前提下，重写并扩写以下 prompt；只输出最终 prompt，不要解释。";
+"usage.today" = "今日";
+"usage.week" = "近 7 天";
+"usage.month" = "近 30 天";
+"usage.custom" = "自定义";
+"usage.start" = "开始";
+"usage.end" = "结束";
+"usage.cue_opens" = "打开次数";
+"usage.first_open" = "首次打开";
+"usage.latest_open" = "最近打开";
+"usage.active_days" = "活跃天数";
+"usage.daily_average" = "日均打开";
+"usage.activity" = "使用趋势";
+"usage.no_activity" = "此时间段暂无活动";
+"usage.no_activity.hint" = "从 agent 会话打开 Cue 后，这里将显示本地使用趋势。";
+"usage.privacy_hint" = "数据仅保存在这台 Mac。当前版本只新增打开时间，不记录 prompt、API Key 或 Pi message；既有使用历史保持不变。";
 "shortcut.toggle" = "显示或隐藏 Cue";
 "shortcut.previous" = "上一个会话";
 "shortcut.next" = "下一个会话";
@@ -78,77 +111,3 @@
 "menu.copy" = "拷贝";
 "menu.paste" = "粘贴";
 "menu.select_all" = "全选";
-
-"settings.page.general" = "通用";
-
-"settings.page.ai" = "AI";
-
-"settings.page.usage" = "使用统计";
-
-"settings.trigger_mode" = "触发方式";
-
-"settings.trigger.automatic" = "自动";
-
-"settings.trigger.manual" = "仅快捷键";
-
-"settings.trigger_delay" = "自动触发延迟";
-
-"settings.maximum_lines" = "最大补全行数";
-
-"settings.manual_completion" = "手动触发补全";
-
-"settings.accept_completion" = "接受补全";
-
-"usage.today" = "今日";
-
-"usage.week" = "近 7 天";
-
-"usage.month" = "近 30 天";
-
-"usage.custom" = "自定义";
-
-"usage.start" = "开始";
-
-"usage.end" = "结束";
-
-"usage.fim_input" = "FIM 输入 token";
-
-"usage.fim_output" = "FIM 输出 token";
-
-"usage.fim_tokens" = "FIM token";
-
-"usage.fim_requests" = "FIM API 调用次数";
-
-"usage.cue_opens" = "Cue 打开次数";
-
-"settings.rewrite_prompt" = "重写提示词";
-"settings.rewrite_prompt.hint" = "修改会自动保存，并在下次重写时应用。提示词中可以让 AI 翻译、重写、扩写或补充细节。";
-
-"settings.model_api_configuration" = "模型 API 配置";
-"settings.pi_integration" = "Pi 集成";
-"settings.pi_integration.install" = "安装";
-"settings.pi_integration.repair" = "修复";
-"settings.pi_integration.uninstall" = "卸载";
-"settings.pi_integration.installed_format" = "已安装（v%lld）";
-"settings.pi_integration.not_installed" = "未安装";
-"settings.pi_integration.needs_repair" = "需要修复";
-"settings.pi_integration.foreign" = "外来目录";
-"settings.pi_integration.foreign_hint" = "该路径已存在目录但没有有效的 Cue manifest。Cue 不会修改或删除它；如为残留可手动移除。";
-"settings.pi_integration.path" = "路径：";
-"settings.pi_integration.required" = "请先安装 Pi 集成以启用内联建议。";
-"settings.pi_integration.external_editor_hint" = "安装后，请配置 Pi 的 externalEditor（Cue 不会自动修改 Pi 设置）：";
-"settings.pi_integration.copy" = "复制";
-"settings.pi_integration.copied" = "已复制";
-"settings.pi_integration.uninstall_confirmation" = "这将从 Pi agent 目录移除由 Cue 管理的 Pi 集成扩展。";
-"settings.ai_rewrite" = "AI 重写";
-"settings.usage_period" = "统计周期";
-"settings.ai_rewrite.default_prompt" = "在不改变原意的前提下，重写并扩写以下 prompt；只输出最终 prompt，不要解释。";
-
-"settings.system_font_regular" = "系统字体常规体";
-
-"settings.fim" = "FIM";
-"unit.milliseconds" = "毫秒";
-"unit.points" = "pt";
-"language.english" = "英文";
-"language.simplified_chinese" = "简体中文";
-"fim_usage.format" = "FIM：%lld/%lld";

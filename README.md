@@ -53,7 +53,7 @@ xattr -dr com.apple.quarantine "$HOME/Applications/Cue Notchpad.app"
 
 ## 报告正式版问题
 
-请使用 [正式版问题报告](https://github.com/haotzops/cue-notchpad/issues/new?template=bug-report.yml)，附上版本、build number 和 `BuildInfo.json` 或 `PROVENANCE.json`。这些 metadata 不包含用户设置、API Key 或 prompt 内容。开发者会先用相同正式资产复现：
+请使用 [正式版问题报告](https://github.com/haotzops/cue-notchpad/issues/new?template=bug-report.yml)，附上版本、build number 和 `BuildInfo.json` 或 `PROVENANCE.json`。这些 metadata 不包含用户设置、API Key、prompt 或 Pi message。开发者会先用相同正式资产复现：
 
 ```bash
 make install-published-release VERSION=x.y.z
@@ -72,18 +72,52 @@ cue --wait
 - `⌥⌘ ←` / `⌥⌘ →`：切换上一个/下一个并发会话（可在设置中修改）
 - 在“设置 → 编辑器 → 编辑器字体”中可使用 macOS 原生字体面板选择字体和字号；安装 Nerd Font 后可选择相应字体显示其私有区图标。
 - 在“设置 → 编辑器”中可开启“中英文之间自动加空格”；开启后仅在提交 prompt 时处理相邻的中文与英文/数字，不影响编辑过程或取消操作。
-- 在“设置 → 编辑器”中可启用 DeepSeek 行间补全：API Key 保存在当前用户的 `~/Library/Application Support/Cue Notchpad/config.json`（权限 `0600`），也可用 `CUE_DEEPSEEK_API_KEY` 环境变量覆盖。Cue 会刷新 DeepSeek 返回的模型列表，由用户自行选择；启用后，光标附近的 prompt 前缀与后缀会发送到 DeepSeek FIM Beta API 生成半透明建议，该调用可能产生 DeepSeek 账户费用。按 `⇧Tab` 手动触发、按 `Tab` 接受建议，按 `Esc` 先关闭建议。该功能默认关闭，候选在接受前不会写入或提交。协议行为以 [FIM 指南](https://api-docs.deepseek.com/zh-cn/guides/fim_completion) 和 [FIM API](https://api-docs.deepseek.com/zh-cn/api/create-completion) 为准。
+- 在“设置 → AI”中可配置 DeepSeek AI 重写：API Key 保存在当前用户的 `~/Library/Application Support/Cue Notchpad/config.json`（权限 `0600`），也可用 `CUE_DEEPSEEK_API_KEY` 环境变量覆盖。Cue 只在用户按重写快捷键时发送当前 prompt，不提供 FIM 或行间补全。
+- 重写提示词支持 `${message}`：当当前 Cue 窗口由 Pi 打开时，可在提示词任意位置插入 active branch 上最近一个 assistant turn 的文本。
 - `⌘ ,`：打开设置窗口
-- 在“设置 → AI”中可显式安装 Cue 管理的全局 Pi integration。安装位置为 `~/.pi/agent/extensions/pi-cue-context/`（或 `PI_CODING_AGENT_DIR` 指定的 agent 目录）；Cue 不修改 Pi 的 `settings.json`。当前 integration 仅建立可校验的安装与所有权边界，不会读取或发送 Pi 会话内容。
+- 在“设置 → AI”中可显式安装 Cue 管理的全局 Pi integration。安装位置为 `~/.pi/agent/extensions/pi-cue-context/`（或 `PI_CODING_AGENT_DIR` 指定的 agent 目录）；Cue 不修改 Pi 的 `settings.json`。
 - 若要让 Pi 的 `Control-G` 使用 Cue，请自行在 Pi 的全局 `settings.json` 中设置 `"externalEditor": "cue --wait"`。卸载 integration 不会修改该设置。
 - 普通 `Return`：在 prompt 中换行
 
 提交后会像 CotEditor 的 `cot --wait` 一样，把焦点还给调用命令时位于前台的终端应用。
 
+## AI 重写与 Pi `${message}`
+
+Cue 的 AI 能力只保留用户显式触发的 Chat Completion 重写。当前编辑器文本作为 user message 发送，用户配置的重写提示词作为 system message 发送；请求可能产生 DeepSeek 账户费用。
+
+Pi integration 安装后，请自行配置：
+
+```json
+{
+  "externalEditor": "cue --wait"
+}
+```
+
+Pi 用 `Control-G` 启动 Cue 时，integration 通过 session-scoped 私有 Unix socket 与随机 capability，向该次 Cue 编辑事务提供 active branch 上最近一个 assistant turn 的文本。可在重写提示词任意位置使用：
+
+```text
+${message}
+```
+
+例如：
+
+```text
+参考上一轮 agent 回复：
+${message}
+
+重写用户当前 prompt，使其能明确回应上述回复。只输出重写结果。
+```
+
+- 只选择最近 assistant turn 的 text block，不包含 thinking、tool call、tool result、图片或整段 session。
+- Pi message 不显示在编辑器、不写入 prompt 文件、UserDefaults、Usage archive 或日志。
+- 只有提示词包含 `${message}` 且用户明确触发重写时，Pi message 才会发送给 DeepSeek。
+- 普通 `cue --wait`、未安装 integration、bridge 超时或验证失败时，`${message}` 展开为空；普通编辑和不依赖该变量的重写继续可用。
+- 多个并发 Cue 会话分别持有启动时取得的 message snapshot，不会互相覆盖。
+
 
 ## 从源码构建
 
-要求 macOS 13+、Swift 6 和 Xcode Command Line Tools。首次使用可先安装命令行工具：
+要求 macOS 13+、Swift 6、Node.js 22+ 和 Xcode Command Line Tools。首次使用可先安装命令行工具：
 
 ```bash
 xcode-select --install

@@ -9,12 +9,19 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 
 ### 新增
 
+- AI 重写提示词支持 `${message}` 变量：由 Pi 启动的 Cue 编辑事务可在任意位置注入 active branch 上最近一个 assistant turn 的文本。
+- Pi integration 使用 session-scoped 私有 Unix socket 与随机 capability 提供单次 message snapshot；普通 Cue 调用和 bridge 失败会安全降级为空变量。
+- 重新设计使用统计页：提供今日/近 7 天/近 30 天/自定义范围、摘要指标、本地活动趋势、空状态和数据清除入口，不新增用户数据采集字段。
 - 新增 Pi integration 安装/修复/卸载：可将 Cue 管理的全局 Pi 扩展安装到 `~/.pi/agent/extensions/pi-cue-context`（或 `PI_CODING_AGENT_DIR` 指定目录），并提供 Pi `externalEditor = "cue --wait"` 的可复制配置指引；Cue 不会自动修改 Pi 设置。
-- 未安装 Pi integration 时，内联补全开关保留原用户设置但不可启用，并显示原因。
+
+### 移除
+
+- 移除 DeepSeek FIM 行间补全、ghost text、自动/手动触发、Tab 接受和相关快捷键；Cue 的 AI 能力收敛为用户显式触发的 Chat Completion 重写。
 
 ### 修复
 
 - Release app 现在包含 Pi integration 资源，并在 CI 中校验包内字节与源码一致。
+- Pi message 只在重写提示词明确包含 `${message}` 且用户触发重写时发送；不会显示、落盘、写入 UserDefaults、Usage archive 或日志。
 - Pi integration 只信任精确的托管文件集合；额外文件、符号链接或伪造 manifest 均只读，卸载不会删除未验证内容。
 - Usage archive 重写会保留受支持 schema 中的未知顶层字段和 record 字段。
 - 设置默认值、窗口约束与快捷键默认值改为共享定义，修复英文环境首次启动可能得到中文 AI 重写提示词的问题。

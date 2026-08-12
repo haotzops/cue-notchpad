@@ -19,6 +19,10 @@
 "settings.editor_font" = "Editor Font";
 "settings.editor_font_size" = "Editor Font Size";
 "settings.editor_font_size.hint" = "Adjust here, or press ⌘+ / ⌘- in the editor.";
+"settings.system_font_regular" = "System Font Regular";
+"unit.points" = "pt";
+"language.english" = "English";
+"language.simplified_chinese" = "Simplified Chinese";
 "settings.choose_font" = "Choose…";
 "settings.restore_default_font" = "Restore default editor font";
 "settings.restore_default_window_size" = "Restore default window size";
@@ -34,13 +38,10 @@
 "settings.cancel" = "Cancel";
 "settings.chinese_english_spacing" = "Add spaces between Chinese and English when submitting";
 "settings.chinese_english_spacing.hint" = "Apply spacing when the prompt is submitted.";
-"settings.inline_completion" = "Enable DeepSeek inline completion";
-"settings.inline_completion.hint" = "When enabled, nearby prompt text is sent to DeepSeek FIM to generate a suggestion. Press Tab to accept it.";
-"settings.inline_completion.model" = "Model";
+"settings.model" = "Model";
 "settings.refresh_models" = "Refresh Models";
 "settings.loading_models" = "Loading available models…";
 "settings.choose_model" = "Choose a model";
-"settings.model_missing" = "Choose a model first.";
 "settings.deepseek_api_key" = "DeepSeek API Key";
 "settings.save_api_key" = "Save API Key";
 "settings.remove_api_key" = "Remove API Key";
@@ -49,21 +50,53 @@
 "settings.api_key_missing" = "Enter an API key before saving.";
 "settings.api_key_saved" = "API key saved in local configuration.";
 "settings.api_key_removed" = "API key removed.";
-"settings.api_key_rejected" = "DeepSeek API key was rejected.";
-"settings.inline_completion_rate_limited" = "DeepSeek is rate limiting completion requests.";
-"settings.inline_completion_unavailable" = "Inline completion is temporarily unavailable.";
-"settings.test_api_key" = "Test Connection";
+"settings.ai_rewrite_unavailable" = "AI rewrite is temporarily unavailable.";
 "settings.health_check" = "Health Check";
 "settings.checking_service_health" = "Checking service health…";
 "settings.service_healthy" = "DeepSeek service is available.";
-"settings.test_fim" = "Test FIM";
-"settings.testing_api_key" = "Testing API key…";
-"settings.fim_available" = "FIM request succeeded.";
-"settings.api_key_valid" = "DeepSeek API key is valid.";
 "settings.overflow_behavior" = "Editor Height";
 "settings.overflow.scrollable" = "Scrollable Window";
 "settings.overflow.grow" = "Grow with Content";
 "settings.shortcuts" = "Shortcuts";
+"settings.page.general" = "General";
+"settings.page.ai" = "AI";
+"settings.page.usage" = "Usage";
+"settings.rewrite_prompt" = "Rewrite prompt";
+"settings.rewrite_prompt.hint" = "Changes save automatically and apply to the next rewrite request. The current editor text is always sent as the user message.";
+"settings.rewrite_prompt.message_variable_hint" = "Use ${message} anywhere to insert the latest assistant turn from the Pi session that opened this Cue window.";
+"settings.model_api_configuration" = "Model API Configuration";
+"settings.pi_integration" = "Pi Integration";
+"settings.pi_integration.install" = "Install";
+"settings.pi_integration.repair" = "Repair";
+"settings.pi_integration.uninstall" = "Uninstall";
+"settings.pi_integration.installed_format" = "Installed (v%lld)";
+"settings.pi_integration.not_installed" = "Not installed";
+"settings.pi_integration.needs_repair" = "Needs repair";
+"settings.pi_integration.foreign" = "Foreign directory";
+"settings.pi_integration.foreign_hint" = "A directory exists at this path without a valid Cue manifest. Cue will not modify or delete it; remove it manually if it is leftover.";
+"settings.pi_integration.path" = "Path:";
+"settings.pi_integration.rewrite_hint" = "When Cue is opened by Pi, the integration provides only the latest text from the active branch's assistant turn. It is kept in memory and is sent to DeepSeek only if ${message} appears in the rewrite prompt and you explicitly run AI Rewrite.";
+"settings.pi_integration.external_editor_hint" = "After installing, configure Pi's externalEditor (Cue never changes Pi settings for you):";
+"settings.pi_integration.copy" = "Copy";
+"settings.pi_integration.copied" = "Copied";
+"settings.pi_integration.uninstall_confirmation" = "This removes the Cue-managed Pi integration extension from the Pi agent directory.";
+"settings.ai_rewrite" = "AI Rewrite";
+"settings.ai_rewrite.default_prompt" = "Rewrite and expand the following prompt without changing its meaning. Output only the final prompt, with no explanation.";
+"usage.today" = "Today";
+"usage.week" = "Last 7 days";
+"usage.month" = "Last 30 days";
+"usage.custom" = "Custom";
+"usage.start" = "Start";
+"usage.end" = "End";
+"usage.cue_opens" = "Cue opens";
+"usage.first_open" = "First open";
+"usage.latest_open" = "Latest open";
+"usage.active_days" = "Active days";
+"usage.daily_average" = "Daily average";
+"usage.activity" = "Activity";
+"usage.no_activity" = "No activity in this period";
+"usage.no_activity.hint" = "Open Cue from an agent session to start building a local activity trend.";
+"usage.privacy_hint" = "Stored only on this Mac. This version adds only open times; prompt text, API keys, and Pi messages are never recorded. Existing usage history is preserved.";
 "shortcut.toggle" = "Show or hide Cue";
 "shortcut.previous" = "Previous session";
 "shortcut.next" = "Next session";
@@ -78,77 +111,3 @@
 "menu.copy" = "Copy";
 "menu.paste" = "Paste";
 "menu.select_all" = "Select All";
-
-"settings.page.general" = "General";
-
-"settings.page.ai" = "AI";
-
-"settings.page.usage" = "Usage";
-
-"settings.trigger_mode" = "Trigger mode";
-
-"settings.trigger.automatic" = "Automatic";
-
-"settings.trigger.manual" = "Shortcut only";
-
-"settings.trigger_delay" = "Automatic trigger delay";
-
-"settings.maximum_lines" = "Maximum completion lines";
-
-"settings.manual_completion" = "Trigger completion";
-
-"settings.accept_completion" = "Accept completion";
-
-"usage.today" = "Today";
-
-"usage.week" = "Last 7 days";
-
-"usage.month" = "Last 30 days";
-
-"usage.custom" = "Custom";
-
-"usage.start" = "Start";
-
-"usage.end" = "End";
-
-"usage.fim_input" = "FIM input tokens";
-
-"usage.fim_output" = "FIM output tokens";
-
-"usage.fim_tokens" = "FIM tokens";
-
-"usage.fim_requests" = "FIM API requests";
-
-"usage.cue_opens" = "Cue opens";
-
-"settings.rewrite_prompt" = "Rewrite prompt";
-"settings.rewrite_prompt.hint" = "Changes save automatically and apply to the next rewrite request. The prompt can ask AI to translate, rewrite, expand, or add detail.";
-
-"settings.model_api_configuration" = "Model API Configuration";
-"settings.pi_integration" = "Pi Integration";
-"settings.pi_integration.install" = "Install";
-"settings.pi_integration.repair" = "Repair";
-"settings.pi_integration.uninstall" = "Uninstall";
-"settings.pi_integration.installed_format" = "Installed (v%lld)";
-"settings.pi_integration.not_installed" = "Not installed";
-"settings.pi_integration.needs_repair" = "Needs repair";
-"settings.pi_integration.foreign" = "Foreign directory";
-"settings.pi_integration.foreign_hint" = "A directory exists at this path without a valid Cue manifest. Cue will not modify or delete it; remove it manually if it is leftover.";
-"settings.pi_integration.path" = "Path:";
-"settings.pi_integration.required" = "Install the Pi integration to enable inline suggestions.";
-"settings.pi_integration.external_editor_hint" = "After installing, configure Pi's externalEditor (Cue never changes Pi settings for you):";
-"settings.pi_integration.copy" = "Copy";
-"settings.pi_integration.copied" = "Copied";
-"settings.pi_integration.uninstall_confirmation" = "This removes the Cue-managed Pi integration extension from the Pi agent directory.";
-"settings.ai_rewrite" = "AI Rewrite";
-"settings.usage_period" = "Statistics period";
-"settings.ai_rewrite.default_prompt" = "Rewrite and expand the following prompt without changing its meaning. Output only the final prompt, with no explanation.";
-
-"settings.system_font_regular" = "System Font Regular";
-
-"settings.fim" = "FIM";
-"unit.milliseconds" = "ms";
-"unit.points" = "pt";
-"language.english" = "English";
-"language.simplified_chinese" = "Simplified Chinese";
-"fim_usage.format" = "FIM: %lld/%lld";
