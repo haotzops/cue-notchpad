@@ -21,6 +21,12 @@ protocol InlineCompletionProvider: Sendable {
 protocol DeepSeekService: Sendable {
     func availableModels(apiKey: String) async throws -> [String]
     func validate(apiKey: String, model: String) async throws
+    func expandPrompt(
+        _ text: String,
+        instruction: String,
+        model: String,
+        apiKey: String
+    ) async throws -> String
 }
 
 enum DeepSeekFIMError: LocalizedError, Equatable, Sendable {
@@ -63,7 +69,7 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider, DeepSeekService {
     }
 
     func validate(apiKey: String, model: String) async throws {
-        var request = makeFIMRequest(apiKey: apiKey, body: DeepSeekFIMRequest(
+        var request = try makeFIMRequest(apiKey: apiKey, body: DeepSeekFIMRequest(
             model: model,
             prompt: "Cue",
             suffix: "",
@@ -106,7 +112,8 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider, DeepSeekService {
                         maxTokens: request.maxTokens,
                         stop: request.stop
                     )
-                    let (bytes, response) = try await session.bytes(for: makeFIMRequest(apiKey: apiKey, body: body))
+                    let fimRequest = try makeFIMRequest(apiKey: apiKey, body: body)
+                    let (bytes, response) = try await session.bytes(for: fimRequest)
                     try validate(response)
 
                     var parser = DeepSeekFIMSSEParser()
@@ -130,14 +137,14 @@ actor DeepSeekFIMCompletionProvider: InlineCompletionProvider, DeepSeekService {
         }
     }
 
-    private func makeFIMRequest(apiKey: String, body: DeepSeekFIMRequest) -> URLRequest {
+    private func makeFIMRequest(apiKey: String, body: DeepSeekFIMRequest) throws -> URLRequest {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try? JSONEncoder().encode(body)
+        request.httpBody = try JSONEncoder().encode(body)
         return request
     }
 

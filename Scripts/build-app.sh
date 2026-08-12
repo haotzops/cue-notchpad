@@ -112,17 +112,19 @@ metadata = {
 Path(sys.argv[1]).write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
 PY
 
-# SwiftPM compiles target resources into sibling bundles. Flatten their
-# localized folders into the conventional app-bundle Resources directory so
-# Bundle.main and localized Info.plist values both work after installation.
+# SwiftPM compiles target resources into sibling bundles. Flatten every runtime
+# resource into the conventional app Resources directory; only SwiftPM's bundle
+# metadata is excluded. New resource types therefore ship without another
+# extension allowlist.
 shopt -s nullglob
 for resource_bundle in "$RESOURCE_BIN_DIR"/CueNotchpad_*.bundle; do
-    for localization in "$resource_bundle"/*.lproj; do
-        cp -R "$localization" "$APP/Contents/Resources/"
-    done
-    for resource in "$resource_bundle"/*.cuebpe "$resource_bundle"/*.svg; do
-        cp "$resource" "$APP/Contents/Resources/"
-    done
+    while IFS= read -r -d '' resource; do
+        relative_path="${resource#"$resource_bundle/"}"
+        [[ "$relative_path" == "Info.plist" ]] && continue
+        destination="$APP/Contents/Resources/$relative_path"
+        mkdir -p "$(dirname "$destination")"
+        cp -R "$resource" "$destination"
+    done < <(find "$resource_bundle" -mindepth 1 -maxdepth 1 -print0)
 done
 shopt -u nullglob
 

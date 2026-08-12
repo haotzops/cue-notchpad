@@ -55,6 +55,15 @@ public struct NotchScreenGeometry: Equatable, Sendable {
     }
 }
 
+public enum NotchLayoutConstraints {
+    public static let defaultOpenWidth: CGFloat = 550
+    public static let defaultOpenHeight: CGFloat = 150
+    public static let minimumOpenWidth: CGFloat = 420
+    public static let maximumOpenWidth: CGFloat = 1_200
+    public static let minimumOpenHeight: CGFloat = 130
+    public static let maximumOpenHeight: CGFloat = 800
+}
+
 public struct NotchLayout: Equatable, Sendable {
     public var closedSize: CGSize
     public var openSize: CGSize
@@ -62,8 +71,8 @@ public struct NotchLayout: Equatable, Sendable {
 
     public init(
         screen: NotchScreenGeometry,
-        preferredOpenWidth: CGFloat = 550,
-        preferredOpenHeight: CGFloat = 150
+        preferredOpenWidth: CGFloat = NotchLayoutConstraints.defaultOpenWidth,
+        preferredOpenHeight: CGFloat = NotchLayoutConstraints.defaultOpenHeight
     ) {
         let measuredNotchWidth: CGFloat? = {
             guard let left = screen.leftAuxiliaryWidth,
@@ -81,8 +90,14 @@ public struct NotchLayout: Equatable, Sendable {
             height: topInset
         )
         self.openSize = CGSize(
-            width: min(max(420, preferredOpenWidth), min(1_200, maximumOpenWidth)),
-            height: min(max(130, preferredOpenHeight), 800)
+            width: min(
+                max(NotchLayoutConstraints.minimumOpenWidth, preferredOpenWidth),
+                min(NotchLayoutConstraints.maximumOpenWidth, maximumOpenWidth)
+            ),
+            height: min(
+                max(NotchLayoutConstraints.minimumOpenHeight, preferredOpenHeight),
+                NotchLayoutConstraints.maximumOpenHeight
+            )
         )
         self.contentTopInset = topInset
     }

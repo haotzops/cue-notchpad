@@ -204,7 +204,10 @@ final class PromptWindowController: NSWindowController {
 
     private func applySettings(editorLayoutMetrics: EditorLayoutMetrics? = nil) {
         guard let panel = window else { return }
-        let maximumHeight = min(CGFloat(800), targetScreen.visibleFrame.height - 8)
+        let maximumHeight = min(
+            NotchLayoutConstraints.maximumOpenHeight,
+            targetScreen.visibleFrame.height - 8
+        )
         let requestedHeight: CGFloat
         if settings.overflowBehavior == .growWithContent,
            let metrics = editorLayoutMetrics ?? presentation.model.editorLayoutMetrics {

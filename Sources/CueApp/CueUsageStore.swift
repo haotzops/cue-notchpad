@@ -16,45 +16,43 @@ struct CueUsageRecord: Codable, Identifiable {
 
 @MainActor
 final class CueUsageStore: ObservableObject {
-    private struct Archive: Codable {
-        let schemaVersion: Int
-        var records: [CueUsageRecord]
-        var cueOpenCount: Int
-        var cueOpenDates: [Date]
-    }
-
     static let shared = CueUsageStore()
     static let schemaVersion = 1
+    static let archiveKey = "cueUsageArchive.v1"
+
     @Published private(set) var records: [CueUsageRecord]
     @Published private(set) var cueOpenCount: Int
     @Published private(set) var cueOpenDates: [Date]
 
-    /// A new, versioned archive. Legacy 0.1/0.2 keys are deliberately left
-    /// untouched; this release neither migrates nor deletes them.
-    private let archiveKey = "cueUsageArchive.v1"
     private let defaults: UserDefaults
-    private var isReadOnly = false
+    private var document: [String: Any]
+    private var recordDocuments: [[String: Any]]
+    private var isReadOnly: Bool
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let loaded = Self.loadArchive(from: defaults)
-        records = loaded.archive.records
-        cueOpenCount = loaded.archive.cueOpenCount
-        cueOpenDates = loaded.archive.cueOpenDates
+        document = loaded.document
+        recordDocuments = loaded.recordDocuments
+        records = loaded.records
+        cueOpenCount = loaded.cueOpenCount
+        cueOpenDates = loaded.cueOpenDates
         isReadOnly = loaded.isReadOnly
     }
 
     func recordCompletionRequest(model: String) {
-        guard !isReadOnly else { return }
-        records.append(.init(id: UUID(), date: .now, kind: .fimRequest, model: model, inputTokens: 0, outputTokens: 0))
-        persist()
+        append(.init(
+            id: UUID(),
+            date: .now,
+            kind: .fimRequest,
+            model: model,
+            inputTokens: 0,
+            outputTokens: 0
+        ))
     }
 
     func recordCompletionUsage(model: String, usage: LLMAPIUsage) {
-        guard !isReadOnly else { return }
-        // Archive v1 calls this historical completion kind "fim". Keep that
-        // stored value until a separately versioned archive migration changes it.
-        records.append(.init(
+        append(.init(
             id: UUID(),
             date: .now,
             kind: .fim,
@@ -62,14 +60,12 @@ final class CueUsageStore: ObservableObject {
             inputTokens: usage.inputTokens,
             outputTokens: usage.outputTokens
         ))
-        persist()
     }
 
-    /// Destructively clears usage only after the user explicitly confirms it in
-    /// Settings. Future or corrupt archives remain read-only and untouched.
     func clearUsageStatistics() {
         guard !isReadOnly else { return }
         records.removeAll()
+        recordDocuments.removeAll()
         cueOpenCount = 0
         cueOpenDates.removeAll()
         persist()
@@ -93,29 +89,75 @@ final class CueUsageStore: ObservableObject {
         )
     }
 
-    private static func loadArchive(from defaults: UserDefaults) -> (archive: Archive, isReadOnly: Bool) {
-        let empty = Archive(schemaVersion: schemaVersion, records: [], cueOpenCount: 0, cueOpenDates: [])
-        guard let data = defaults.data(forKey: "cueUsageArchive.v1") else {
-            return (empty, false)
+    private func append(_ record: CueUsageRecord) {
+        guard !isReadOnly, let recordDocument = Self.jsonObject(for: record) else { return }
+        records.append(record)
+        recordDocuments.append(recordDocument)
+        persist()
+    }
+
+    private static func loadArchive(from defaults: UserDefaults) -> (
+        document: [String: Any],
+        recordDocuments: [[String: Any]],
+        records: [CueUsageRecord],
+        cueOpenCount: Int,
+        cueOpenDates: [Date],
+        isReadOnly: Bool
+    ) {
+        let empty: [String: Any] = [
+            "schemaVersion": schemaVersion,
+            "records": [],
+            "cueOpenCount": 0,
+            "cueOpenDates": [],
+        ]
+        guard let data = defaults.data(forKey: archiveKey) else {
+            return (empty, [], [], 0, [], false)
         }
-        let version = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["schemaVersion"] as? Int
-        guard version == schemaVersion,
-              let archive = try? JSONDecoder().decode(Archive.self, from: data)
+        guard let document = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              document["schemaVersion"] as? Int == schemaVersion,
+              let recordDocuments = document["records"] as? [[String: Any]],
+              let records = decodeRecords(recordDocuments),
+              let cueOpenCount = document["cueOpenCount"] as? Int,
+              let cueOpenDates = decodeDates(document["cueOpenDates"])
         else {
-            // A corrupt or future archive must never be replaced by an empty one.
-            return (empty, true)
+            return (empty, [], [], 0, [], true)
         }
-        return (archive, false)
+        return (document, recordDocuments, records, cueOpenCount, cueOpenDates, false)
     }
 
     private func persist() {
-        let archive = Archive(
-            schemaVersion: Self.schemaVersion,
-            records: records,
-            cueOpenCount: cueOpenCount,
-            cueOpenDates: cueOpenDates
-        )
-        guard let data = try? JSONEncoder().encode(archive) else { return }
-        defaults.set(data, forKey: archiveKey)
+        document["schemaVersion"] = Self.schemaVersion
+        document["records"] = recordDocuments
+        document["cueOpenCount"] = cueOpenCount
+        document["cueOpenDates"] = cueOpenDates.map(\.timeIntervalSinceReferenceDate)
+        guard JSONSerialization.isValidJSONObject(document),
+              let data = try? JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+        else { return }
+        defaults.set(data, forKey: Self.archiveKey)
+    }
+
+    private static func decodeRecords(_ documents: [[String: Any]]) -> [CueUsageRecord]? {
+        documents.reduce(into: Optional<[CueUsageRecord]>([])) { result, document in
+            guard var records = result,
+                  JSONSerialization.isValidJSONObject(document),
+                  let data = try? JSONSerialization.data(withJSONObject: document),
+                  let record = try? JSONDecoder().decode(CueUsageRecord.self, from: data)
+            else {
+                result = nil
+                return
+            }
+            records.append(record)
+            result = records
+        }
+    }
+
+    private static func decodeDates(_ value: Any?) -> [Date]? {
+        guard let values = value as? [NSNumber] else { return nil }
+        return values.map { Date(timeIntervalSinceReferenceDate: $0.doubleValue) }
+    }
+
+    private static func jsonObject(for record: CueUsageRecord) -> [String: Any]? {
+        guard let data = try? JSONEncoder().encode(record) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 }

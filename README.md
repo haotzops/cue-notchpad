@@ -74,7 +74,8 @@ cue --wait
 - 在“设置 → 编辑器”中可开启“中英文之间自动加空格”；开启后仅在提交 prompt 时处理相邻的中文与英文/数字，不影响编辑过程或取消操作。
 - 在“设置 → 编辑器”中可启用 DeepSeek 行间补全：API Key 保存在当前用户的 `~/Library/Application Support/Cue Notchpad/config.json`（权限 `0600`），也可用 `CUE_DEEPSEEK_API_KEY` 环境变量覆盖。Cue 会刷新 DeepSeek 返回的模型列表，由用户自行选择；启用后，光标附近的 prompt 前缀与后缀会发送到 DeepSeek FIM Beta API 生成半透明建议，该调用可能产生 DeepSeek 账户费用。按 `⇧Tab` 手动触发、按 `Tab` 接受建议，按 `Esc` 先关闭建议。该功能默认关闭，候选在接受前不会写入或提交。协议行为以 [FIM 指南](https://api-docs.deepseek.com/zh-cn/guides/fim_completion) 和 [FIM API](https://api-docs.deepseek.com/zh-cn/api/create-completion) 为准。
 - `⌘ ,`：打开设置窗口
-- 项目内置 Pi 扩展 `.pi/extensions/cue-pi-context.ts`：在 Pi 中运行 `/cue [草稿]` 可显式打开 Cue，并以带边界标记的格式附带最近 20 条会话记录；确认提交后内容会作为 Pi follow-up 发送。该扩展不会自动发送会话内容。
+- 在“设置 → AI”中可显式安装 Cue 管理的全局 Pi integration。安装位置为 `~/.pi/agent/extensions/pi-cue-context/`（或 `PI_CODING_AGENT_DIR` 指定的 agent 目录）；Cue 不修改 Pi 的 `settings.json`。当前 integration 仅建立可校验的安装与所有权边界，不会读取或发送 Pi 会话内容。
+- 若要让 Pi 的 `Control-G` 使用 Cue，请自行在 Pi 的全局 `settings.json` 中设置 `"externalEditor": "cue --wait"`。卸载 integration 不会修改该设置。
 - 普通 `Return`：在 prompt 中换行
 
 提交后会像 CotEditor 的 `cot --wait` 一样，把焦点还给调用命令时位于前台的终端应用。

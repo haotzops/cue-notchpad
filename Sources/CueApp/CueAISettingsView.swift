@@ -128,7 +128,11 @@ struct CueAISettingsView: View {
                     Text("\(settings.inlineCompletionMaximumLines)")
                         .monospacedDigit()
                         .frame(minWidth: 18, alignment: .trailing)
-                    Stepper("", value: $settings.inlineCompletionMaximumLines, in: 1 ... 100)
+                    Stepper(
+                        "",
+                        value: $settings.inlineCompletionMaximumLines,
+                        in: 1 ... CueSettings.maximumInlineCompletionLines
+                    )
                         .labelsHidden()
                 }
             }

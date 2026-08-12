@@ -7,9 +7,11 @@
       "kind": "fim",
       "model": "example-model",
       "inputTokens": 12,
-      "outputTokens": 34
+      "outputTokens": 34,
+      "futureRecordField": "must-survive-a-supported-write"
     }
   ],
   "cueOpenCount": 1,
-  "cueOpenDates": [0]
+  "cueOpenDates": [0],
+  "futureArchiveField": "must-survive-a-supported-write"
 }

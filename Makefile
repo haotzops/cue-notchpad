@@ -17,8 +17,7 @@ build-release: tokenizer
 	swift build -c release
 
 test: tokenizer
-	swift test
-	swift run cue-core-tests
+	swift run cue-tests
 
 app: tokenizer
 	CONFIGURATION=debug ./Scripts/build-app.sh

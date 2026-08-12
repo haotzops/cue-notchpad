@@ -21,14 +21,14 @@ struct CueGeneralSettingsView: View {
                 dimensionField(
                     settings.localized(.settingsWidth),
                     value: $settings.windowWidth,
-                    range: 420 ... 1_200
+                    range: CueSettings.minimumWindowWidth ... CueSettings.maximumWindowWidth
                 )
                 Text("×")
                     .foregroundStyle(.secondary)
                 dimensionField(
                     settings.localized(.settingsHeight),
                     value: $settings.windowHeight,
-                    range: CueSettings.minimumWindowHeight ... 800
+                    range: CueSettings.minimumWindowHeight ... CueSettings.maximumWindowHeight
                 )
                 Button {
                     settings.windowWidth = CueSettings.defaultWindowWidth

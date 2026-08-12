@@ -49,9 +49,19 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
+          fixtures = Path("Tests/Fixtures/Persistence")
           for name in ("config-v1.json", "usage-v1.json"):
-              document = json.loads((Path("Tests/Fixtures/Persistence") / name).read_text())
+              document = json.loads((fixtures / name).read_text())
               assert document["schemaVersion"] == 1, name
+          future_usage = json.loads((fixtures / "usage-future.json").read_text())
+          assert future_usage["schemaVersion"] > 1
+          for name in ("config-corrupt.json", "usage-corrupt.json"):
+              try:
+                  json.loads((fixtures / name).read_text())
+              except json.JSONDecodeError:
+                  pass
+              else:
+                  raise AssertionError(f"{name} must remain corrupt")
           PY
 
       - name: Build debug products
@@ -72,6 +82,9 @@ jobs:
           test -f "$app/Contents/Resources/cue-logo.icns"
           test -f "$app/Contents/Resources/ThirdPartyNotices.txt"
           test -f "$app/Contents/Resources/LICENSE.txt"
+          test -f "$app/Contents/Resources/index.ts"
+          cmp Sources/CueCore/Resources/PiIntegration/pi-cue-context/index.ts \
+            "$app/Contents/Resources/index.ts"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = "io.github.haotzops.cue-notchpad"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = "$GITHUB_RUN_NUMBER"

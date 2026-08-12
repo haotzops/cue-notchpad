@@ -1,3 +1,5 @@
+import AppKit
+@testable import CueApp
 import CoreGraphics
 import CueCore
 import Darwin
@@ -23,7 +25,10 @@ private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     }
 }
 
-private func expectThrows<Result>(_ body: @autoclosure () throws -> Result, _ message: String) {
+private func expectThrows<Result>(
+    _ body: @autoclosure () throws -> Result,
+    _ message: String
+) {
     do {
         _ = try body()
         failureCount += 1
@@ -31,6 +36,13 @@ private func expectThrows<Result>(_ body: @autoclosure () throws -> Result, _ me
     } catch {
         // Expected.
     }
+}
+
+private func fixtureData(named name: String) throws -> Data {
+    let testsDirectory = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    return try Data(contentsOf: testsDirectory.appendingPathComponent("Fixtures/Persistence/\(name)"))
 }
 
 do {
@@ -340,6 +352,26 @@ do {
     let piService = CuePiIntegrationService(agentDirectory: root)
     expect(piService.state() == .notInstalled, "fresh agent directory reports not installed")
 
+    let linkedAgentDirectory = root.appendingPathComponent("linked-agent")
+    let realExtensionDirectory = root.appendingPathComponent("real-extension")
+    try FileManager.default.createDirectory(
+        at: linkedAgentDirectory.appendingPathComponent("extensions"),
+        withIntermediateDirectories: true
+    )
+    try FileManager.default.createDirectory(
+        at: realExtensionDirectory,
+        withIntermediateDirectories: true
+    )
+    let linkedIntegrationDirectory = linkedAgentDirectory
+        .appendingPathComponent("extensions/pi-cue-context")
+    try FileManager.default.createSymbolicLink(
+        at: linkedIntegrationDirectory,
+        withDestinationURL: realExtensionDirectory
+    )
+    let linkedService = CuePiIntegrationService(agentDirectory: linkedAgentDirectory)
+    expect(linkedService.state() == .foreign, "a linked integration root is foreign")
+    expectThrows(try linkedService.install(), "install refuses a linked integration root")
+
     try piService.install()
     expect(
         piService.state() == .installed(version: CuePiIntegrationService.integrationVersion),
@@ -353,6 +385,17 @@ do {
     )
 
     let extensionURL = piService.integrationDirectory.appendingPathComponent("index.ts")
+    let extraURL = piService.integrationDirectory.appendingPathComponent("user-notes.txt")
+    try Data("user-owned".utf8).write(to: extraURL)
+    expect(piService.state() == .foreign, "additional files make an installation foreign")
+    expectThrows(try piService.uninstall(), "uninstall refuses additional user files")
+    expect(FileManager.default.fileExists(atPath: extraURL.path), "refused uninstall preserves user files")
+    try FileManager.default.removeItem(at: extraURL)
+    expect(
+        piService.state() == .installed(version: CuePiIntegrationService.integrationVersion),
+        "removing an additional file restores verification"
+    )
+
     try Data("tampered".utf8).write(to: extensionURL)
     expect(
         piService.state() == .needsRepair(installedVersion: CuePiIntegrationService.integrationVersion),
@@ -363,6 +406,17 @@ do {
     expect(
         piService.state() == .installed(version: CuePiIntegrationService.integrationVersion),
         "repair restores a verified installation"
+    )
+
+    try FileManager.default.removeItem(at: extensionURL)
+    expect(
+        piService.state() == .needsRepair(installedVersion: CuePiIntegrationService.integrationVersion),
+        "missing managed files require repair"
+    )
+    try piService.repair()
+    expect(
+        piService.state() == .installed(version: CuePiIntegrationService.integrationVersion),
+        "repair restores a missing managed file"
     )
 
     try FileManager.default.removeItem(
@@ -387,6 +441,23 @@ do {
     // user would do before reinstalling.
     try FileManager.default.removeItem(at: piService.integrationDirectory)
     try piService.install()
+    var emptyFilesManifest = try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL))
+        as? [String: Any] ?? [:]
+    emptyFilesManifest["files"] = [:]
+    try JSONSerialization.data(withJSONObject: emptyFilesManifest).write(to: manifestURL)
+    expect(piService.state() == .foreign, "empty managed file lists are not trusted")
+    expectThrows(try piService.uninstall(), "empty managed file lists cannot authorize uninstall")
+
+    try FileManager.default.removeItem(at: piService.integrationDirectory)
+    try piService.install()
+    var unsafeManifest = try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL))
+        as? [String: Any] ?? [:]
+    unsafeManifest["files"] = ["../user-file": "invalid"]
+    try JSONSerialization.data(withJSONObject: unsafeManifest).write(to: manifestURL)
+    expect(piService.state() == .foreign, "unsafe manifest paths are not trusted")
+
+    try FileManager.default.removeItem(at: piService.integrationDirectory)
+    try piService.install()
     try piService.uninstall()
     expect(piService.state() == .notInstalled, "uninstall removes a verified installation")
     expect(
@@ -401,9 +472,146 @@ do {
     expect(false, "pi integration service should not throw: \(error)")
 }
 
-if failureCount == 0 {
-    print("All CueCore tests passed")
-    exit(EXIT_SUCCESS)
+@MainActor
+private func runAppTests() async {
+    do {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cue-api-key-tests-\(UUID().uuidString)")
+        let url = directory.appendingPathComponent("config.json")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        CueAPIKeyStore.configurationURLOverride = url
+        defer { CueAPIKeyStore.configurationURLOverride = nil }
+
+        try fixtureData(named: "config-v1.json").write(to: url)
+        try CueAPIKeyStore.saveDeepSeekAPIKey("replacement-key")
+        let document = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        expect(document?["schemaVersion"] as? Int == 1, "API key schema remains supported")
+        expect(document?["deepSeekAPIKey"] as? String == "replacement-key", "API key is replaced")
+        expect(
+            document?["futureField"] as? String == "must-survive-a-supported-write",
+            "API key writes preserve unknown fields"
+        )
+
+        var futureDocument = document ?? [:]
+        futureDocument["schemaVersion"] = 2
+        let futureData = try JSONSerialization.data(withJSONObject: futureDocument)
+        try futureData.write(to: url)
+        expectThrows(
+            try CueAPIKeyStore.saveDeepSeekAPIKey("must-not-write"),
+            "API key writes reject future schemas"
+        )
+        let unchangedFutureData = try Data(contentsOf: url)
+        expect(unchangedFutureData == futureData, "future API key config remains unchanged")
+
+        let corruptData = try fixtureData(named: "config-corrupt.json")
+        try corruptData.write(to: url)
+        expectThrows(
+            try CueAPIKeyStore.saveDeepSeekAPIKey("must-not-write"),
+            "API key writes reject corrupt config"
+        )
+        let unchangedCorruptData = try Data(contentsOf: url)
+        expect(unchangedCorruptData == corruptData, "corrupt API key config remains unchanged")
+    } catch {
+        expect(false, "API key persistence tests should not throw: \(error)")
+    }
+
+    do {
+        let suiteName = "cue-usage-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(try fixtureData(named: "usage-v1.json"), forKey: CueUsageStore.archiveKey)
+        let usage = CueUsageStore(defaults: defaults)
+        expect(usage.records.count == 1, "usage fixture is readable")
+        expect(usage.records.first?.totalTokens == 46, "usage fixture token total")
+        usage.recordCompletionRequest(model: "new-model")
+
+        let storedData = defaults.data(forKey: CueUsageStore.archiveKey) ?? Data()
+        let stored = try JSONSerialization.jsonObject(with: storedData) as? [String: Any]
+        let storedRecords = stored?["records"] as? [[String: Any]]
+        expect(
+            stored?["futureArchiveField"] as? String == "must-survive-a-supported-write",
+            "usage writes preserve unknown archive fields"
+        )
+        expect(
+            storedRecords?.first?["futureRecordField"] as? String == "must-survive-a-supported-write",
+            "usage writes preserve unknown record fields"
+        )
+
+        usage.clearUsageStatistics()
+        let clearedData = defaults.data(forKey: CueUsageStore.archiveKey) ?? Data()
+        let cleared = try JSONSerialization.jsonObject(with: clearedData) as? [String: Any]
+        expect((cleared?["records"] as? [Any])?.isEmpty == true, "usage clear empties records")
+        expect(cleared?["schemaVersion"] as? Int == CueUsageStore.schemaVersion, "usage clear preserves schema")
+        expect(
+            cleared?["futureArchiveField"] as? String == "must-survive-a-supported-write",
+            "usage clear preserves unknown archive fields"
+        )
+
+        for fixture in ["usage-future.json", "usage-corrupt.json"] {
+            let protectedData = try fixtureData(named: fixture)
+            defaults.set(protectedData, forKey: CueUsageStore.archiveKey)
+            let protectedStore = CueUsageStore(defaults: defaults)
+            protectedStore.recordCueOpen()
+            protectedStore.clearUsageStatistics()
+            expect(
+                defaults.data(forKey: CueUsageStore.archiveKey) == protectedData,
+                "\(fixture) remains read-only"
+            )
+        }
+    } catch {
+        expect(false, "usage persistence tests should not throw: \(error)")
+    }
+
+    let englishSuite = "cue-settings-en-\(UUID().uuidString)"
+    let englishDefaults = UserDefaults(suiteName: englishSuite)!
+    defer { englishDefaults.removePersistentDomain(forName: englishSuite) }
+    englishDefaults.set(CueLanguage.english.rawValue, forKey: "language")
+    let english = CueSettings(defaults: englishDefaults)
+    expect(english.inlineCompletionTriggerMode == .manual, "settings use the registered trigger default")
+    expect(
+        english.promptExpansionInstruction
+            == CueLocalization.string(.settingsAIRewriteDefaultPrompt, localization: "en"),
+        "English settings use the English rewrite prompt"
+    )
+
+    let chineseSuite = "cue-settings-zh-\(UUID().uuidString)"
+    let chineseDefaults = UserDefaults(suiteName: chineseSuite)!
+    defer { chineseDefaults.removePersistentDomain(forName: chineseSuite) }
+    chineseDefaults.set(CueLanguage.simplifiedChinese.rawValue, forKey: "language")
+    let chinese = CueSettings(defaults: chineseDefaults)
+    expect(
+        chinese.promptExpansionInstruction
+            == CueLocalization.string(.settingsAIRewriteDefaultPrompt, localization: "zh-Hans"),
+        "Chinese settings use the Chinese rewrite prompt"
+    )
+    chineseDefaults.set("user-owned instruction", forKey: "promptExpansionInstruction")
+    expect(
+        CueSettings(defaults: chineseDefaults).promptExpansionInstruction == "user-owned instruction",
+        "settings preserve a user-owned rewrite prompt"
+    )
+
+    let model = PromptModel(text: "old", tokenCounter: CharacterTokenCounter())
+    model.acceptCommittedText("latest")
+    try? await Task.sleep(for: .milliseconds(300))
+    expect(model.editorTokenEstimate?.count == 6, "prompt model publishes the latest token count")
 }
 
+private struct CharacterTokenCounter: TextTokenCounting {
+    func count(
+        _ text: String,
+        for target: TokenCountingTarget,
+        cancellingWhen shouldCancel: @escaping @Sendable () -> Bool
+    ) -> TokenCountEstimate? {
+        guard !shouldCancel() else { return nil }
+        return TokenCountEstimate(count: text.count, tokenizer: target.tokenizer, accuracy: target.accuracy)
+    }
+}
+
+await runAppTests()
+
+if failureCount == 0 {
+    print("All Cue tests passed")
+    exit(EXIT_SUCCESS)
+}
 exit(EXIT_FAILURE)

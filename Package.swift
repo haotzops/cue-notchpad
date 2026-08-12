@@ -9,15 +9,14 @@ let package = Package(
         .library(name: "CueCore", targets: ["CueCore"]),
         .executable(name: "cue", targets: ["cue"]),
         .executable(name: "cue-host", targets: ["cue-host"]),
-        .executable(name: "cue-core-tests", targets: ["CueCoreTests"]),
+        .executable(name: "cue-tests", targets: ["CueTests"]),
     ],
     targets: [
         .target(name: "CueCore", resources: [.process("Resources")]),
         .target(name: "CueApp", dependencies: ["CueCore"], resources: [.copy("../../Supporting/logo.svg")]),
         .executableTarget(name: "cue", dependencies: ["CueCore"]),
         .executableTarget(name: "cue-host", dependencies: ["CueApp", "CueCore"]),
-        .executableTarget(name: "CueCoreTests", dependencies: ["CueCore"], path: "Tests/CueCoreTests"),
-        .testTarget(name: "CueCoreXCTests", dependencies: ["CueCore", "CueApp"], path: "Tests/CueCoreXCTests"),
+        .executableTarget(name: "CueTests", dependencies: ["CueCore", "CueApp"], path: "Tests/CueTests"),
     ],
     swiftLanguageModes: [.v5]
 )

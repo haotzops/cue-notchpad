@@ -125,7 +125,7 @@ final class PromptPresentation: ObservableObject {
     @Published var sessionID: UUID
     @Published var transitionDirection = 1
     @Published var isExpanded = false
-    @Published var effectiveOpenHeight: CGFloat = 150
+    @Published var effectiveOpenHeight = NotchLayoutConstraints.defaultOpenHeight
     var previousSession: () -> Void = {}
     var nextSession: () -> Void = {}
 

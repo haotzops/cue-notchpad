@@ -43,18 +43,20 @@ struct PromptTextEditor: NSViewRepresentable {
         textView.promptExpansionShortcut = settings.promptExpansionShortcut
         textView.inlineCompletionAcceptShortcut = settings.inlineCompletionAcceptShortcut
         textView.onExpandPrompt = { [weak textView, weak model, weak settings] in
-            guard let textView, let model, let settings,
-                  !textView.string.isEmpty,
-                  let key = try? CueAPIKeyStore.loadDeepSeekAPIKey(),
-                  let selectedModel = settings.promptExpansionModel
-            else { return }
+            guard let textView, let model, let settings, !textView.string.isEmpty else { return }
             let original = textView.string
             Task { @MainActor in
-                guard let expanded = try? await DeepSeekFIMCompletionProvider().expandPrompt(original, instruction: settings.promptExpansionInstruction, model: selectedModel, apiKey: key), textView.string == original else { return }
-                textView.string = expanded
-                textView.setSelectedRange(NSRange(location: expanded.utf16.count, length: 0))
-                model.acceptCommittedText(expanded)
-                textView.didChangeText()
+                do {
+                    guard let expanded = try await settings.expandPrompt(original),
+                          textView.string == original
+                    else { return }
+                    textView.string = expanded
+                    textView.setSelectedRange(NSRange(location: expanded.utf16.count, length: 0))
+                    model.acceptCommittedText(expanded)
+                    textView.didChangeText()
+                } catch {
+                    // CueSettings publishes the user-visible service error.
+                }
             }
         }
         textView.string = model.text
@@ -279,7 +281,7 @@ struct CueInlineCompletion: Equatable {
 final class CueTextView: NSTextView {
     var onSubmit: (() -> Void)?
     var inlineCompletionTriggerShortcut = CueShortcut.inlineCompletionDefault
-    var inlineCompletionAcceptShortcut = CueShortcut(keyCode: 48, modifiers: 0)
+    var inlineCompletionAcceptShortcut = CueShortcut.inlineCompletionAcceptDefault
     var onCancel: (() -> Void)?
     var onHide: (() -> Void)?
     var onOpenSettings: (() -> Void)?

@@ -44,52 +44,58 @@ struct InlineCompletionStatus: Equatable {
 }
 
 final class CueSettings: ObservableObject {
-    static let defaults = UserDefaults.standard
-    static let defaultWindowWidth = 550.0
-    static let defaultWindowHeight = 150.0
-    static let minimumWindowHeight = 130.0
+    static let defaultWindowWidth = Double(NotchLayoutConstraints.defaultOpenWidth)
+    static let defaultWindowHeight = Double(NotchLayoutConstraints.defaultOpenHeight)
+    static let minimumWindowHeight = Double(NotchLayoutConstraints.minimumOpenHeight)
+    static let maximumWindowHeight = Double(NotchLayoutConstraints.maximumOpenHeight)
+    static let minimumWindowWidth = Double(NotchLayoutConstraints.minimumOpenWidth)
+    static let maximumWindowWidth = Double(NotchLayoutConstraints.maximumOpenWidth)
     static let defaultEditorFontSize = 16.0
-    /// Baseline schema for settings created by this and later releases.
     static let persistenceSchemaVersion = 1
     static let minimumEditorFontSize = 8.0
     static let maximumEditorFontSize = 72.0
+    static let defaultInlineCompletionDelayMilliseconds = 200.0
+    static let maximumInlineCompletionDelayMilliseconds = 5_000.0
+    static let defaultInlineCompletionMaximumLines = 1
+    static let maximumInlineCompletionLines = 100
 
+    private let defaults: UserDefaults
     private let deepSeekService: any DeepSeekService
     private let piIntegrationService: CuePiIntegrationService
 
     @Published var language: CueLanguage {
-        didSet { Self.defaults.set(language.rawValue, forKey: Keys.language) }
+        didSet { defaults.set(language.rawValue, forKey: Keys.language) }
     }
 
     @Published var windowWidth: Double {
         didSet {
-            let clamped = min(max(windowWidth, 420), 1_200)
+            let clamped = min(max(windowWidth, Self.minimumWindowWidth), Self.maximumWindowWidth)
             guard clamped == windowWidth else {
                 windowWidth = clamped
                 return
             }
-            Self.defaults.set(windowWidth, forKey: Keys.windowWidth)
+            defaults.set(windowWidth, forKey: Keys.windowWidth)
         }
     }
 
     @Published var windowHeight: Double {
         didSet {
-            let clamped = min(max(windowHeight, Self.minimumWindowHeight), 800)
+            let clamped = min(max(windowHeight, Self.minimumWindowHeight), Self.maximumWindowHeight)
             guard clamped == windowHeight else {
                 windowHeight = clamped
                 return
             }
-            Self.defaults.set(windowHeight, forKey: Keys.windowHeight)
+            defaults.set(windowHeight, forKey: Keys.windowHeight)
         }
     }
 
     @Published var overflowBehavior: CueOverflowBehavior {
-        didSet { Self.defaults.set(overflowBehavior.rawValue, forKey: Keys.overflowBehavior) }
+        didSet { defaults.set(overflowBehavior.rawValue, forKey: Keys.overflowBehavior) }
     }
 
     /// Stored as a PostScript name because it remains stable across localized font display names.
     @Published var editorFontName: String {
-        didSet { Self.defaults.set(editorFontName, forKey: Keys.editorFontName) }
+        didSet { defaults.set(editorFontName, forKey: Keys.editorFontName) }
     }
 
     @Published var editorFontSize: Double {
@@ -99,44 +105,54 @@ final class CueSettings: ObservableObject {
                 editorFontSize = clamped
                 return
             }
-            Self.defaults.set(editorFontSize, forKey: Keys.editorFontSize)
+            defaults.set(editorFontSize, forKey: Keys.editorFontSize)
         }
     }
 
     @Published var insertsSpacesBetweenChineseAndEnglish: Bool {
-        didSet { Self.defaults.set(insertsSpacesBetweenChineseAndEnglish, forKey: Keys.insertsSpacesBetweenChineseAndEnglish) }
+        didSet { defaults.set(insertsSpacesBetweenChineseAndEnglish, forKey: Keys.insertsSpacesBetweenChineseAndEnglish) }
     }
 
     @Published var inlineCompletionEnabled: Bool {
         didSet {
-            Self.defaults.set(inlineCompletionEnabled, forKey: Keys.inlineCompletionEnabled)
+            defaults.set(inlineCompletionEnabled, forKey: Keys.inlineCompletionEnabled)
             if inlineCompletionEnabled { refreshDeepSeekModelsIfPossible() }
         }
     }
 
     @Published var inlineCompletionTriggerMode: InlineCompletionTriggerMode {
-        didSet { Self.defaults.set(inlineCompletionTriggerMode.rawValue, forKey: Keys.inlineCompletionTriggerMode) }
+        didSet { defaults.set(inlineCompletionTriggerMode.rawValue, forKey: Keys.inlineCompletionTriggerMode) }
     }
     @Published var inlineCompletionDelayMilliseconds: Double {
-        didSet { Self.defaults.set(min(max(inlineCompletionDelayMilliseconds, 0), 5_000), forKey: Keys.inlineCompletionDelayMilliseconds) }
+        didSet {
+            defaults.set(
+                min(max(inlineCompletionDelayMilliseconds, 0), Self.maximumInlineCompletionDelayMilliseconds),
+                forKey: Keys.inlineCompletionDelayMilliseconds
+            )
+        }
     }
     @Published var inlineCompletionMaximumLines: Int {
-        didSet { Self.defaults.set(min(max(inlineCompletionMaximumLines, 1), 100), forKey: Keys.inlineCompletionMaximumLines) }
+        didSet {
+            defaults.set(
+                min(max(inlineCompletionMaximumLines, 1), Self.maximumInlineCompletionLines),
+                forKey: Keys.inlineCompletionMaximumLines
+            )
+        }
     }
 
     @Published var promptExpansionModel: String? {
-        didSet { Self.defaults.set(promptExpansionModel, forKey: Keys.promptExpansionModel) }
+        didSet { defaults.set(promptExpansionModel, forKey: Keys.promptExpansionModel) }
     }
     @Published var promptExpansionInstruction: String {
-        didSet { Self.defaults.set(promptExpansionInstruction, forKey: Keys.promptExpansionInstruction) }
+        didSet { defaults.set(promptExpansionInstruction, forKey: Keys.promptExpansionInstruction) }
     }
 
     @Published var inlineCompletionModel: String? {
         didSet {
             if let inlineCompletionModel {
-                Self.defaults.set(inlineCompletionModel, forKey: Keys.inlineCompletionModel)
+                defaults.set(inlineCompletionModel, forKey: Keys.inlineCompletionModel)
             } else {
-                Self.defaults.removeObject(forKey: Keys.inlineCompletionModel)
+                defaults.removeObject(forKey: Keys.inlineCompletionModel)
             }
         }
     }
@@ -169,8 +185,8 @@ final class CueSettings: ObservableObject {
     }
 
     var localizationIdentifier: String? { language.localizationIdentifier }
-    var normalizedWidth: Double { min(max(windowWidth, 420), 1_200) }
-    var normalizedHeight: Double { min(max(windowHeight, Self.minimumWindowHeight), 800) }
+    var normalizedWidth: Double { min(max(windowWidth, Self.minimumWindowWidth), Self.maximumWindowWidth) }
+    var normalizedHeight: Double { min(max(windowHeight, Self.minimumWindowHeight), Self.maximumWindowHeight) }
 
     /// Falls back safely if a font selected on another machine is not installed here.
     var editorFont: NSFont {
@@ -206,18 +222,29 @@ final class CueSettings: ObservableObject {
         insertsSpacesBetweenChineseAndEnglish = false
         inlineCompletionEnabled = false
         inlineCompletionTriggerMode = .manual
-        inlineCompletionDelayMilliseconds = 200
-        inlineCompletionMaximumLines = 1
+        inlineCompletionDelayMilliseconds = Self.defaultInlineCompletionDelayMilliseconds
+        inlineCompletionMaximumLines = Self.defaultInlineCompletionMaximumLines
         inlineCompletionModel = nil
         promptExpansionModel = nil
-        promptExpansionInstruction = CueLocalization.string(.settingsAIRewriteDefaultPrompt)
+        promptExpansionInstruction = localizedDefaultPromptInstruction()
         toggleShortcut = .toggleDefault
         previousShortcut = .previousDefault
         nextShortcut = .nextDefault
         inlineCompletionShortcut = .inlineCompletionDefault
-        inlineCompletionAcceptShortcut = CueShortcut(keyCode: 48, modifiers: 0)
+        inlineCompletionAcceptShortcut = .inlineCompletionAcceptDefault
         promptExpansionShortcut = .promptExpansionDefault
         inlineCompletionStatus = nil
+    }
+
+    private func localizedDefaultPromptInstruction() -> String {
+        Self.defaultPromptInstruction(for: language)
+    }
+
+    private static func defaultPromptInstruction(for language: CueLanguage) -> String {
+        CueLocalization.string(
+            .settingsAIRewriteDefaultPrompt,
+            localization: language.localizationIdentifier
+        )
     }
 
     private static var defaultEditorFont: NSFont {
@@ -225,15 +252,17 @@ final class CueSettings: ObservableObject {
     }
 
     init(
+        defaults: UserDefaults = .standard,
         deepSeekService: any DeepSeekService = DeepSeekFIMCompletionProvider(),
         piIntegrationService: CuePiIntegrationService = .shared
     ) {
+        self.defaults = defaults
         self.deepSeekService = deepSeekService
         self.piIntegrationService = piIntegrationService
-        if Self.defaults.object(forKey: Keys.schemaVersion) == nil {
-            Self.defaults.set(Self.persistenceSchemaVersion, forKey: Keys.schemaVersion)
+        if defaults.object(forKey: Keys.schemaVersion) == nil {
+            defaults.set(Self.persistenceSchemaVersion, forKey: Keys.schemaVersion)
         }
-        Self.defaults.register(defaults: [
+        defaults.register(defaults: [
             Keys.language: CueLanguage.system.rawValue,
             Keys.windowWidth: Self.defaultWindowWidth,
             Keys.windowHeight: Self.defaultWindowHeight,
@@ -243,52 +272,74 @@ final class CueSettings: ObservableObject {
             Keys.insertsSpacesBetweenChineseAndEnglish: false,
             Keys.inlineCompletionEnabled: false,
             Keys.inlineCompletionTriggerMode: InlineCompletionTriggerMode.manual.rawValue,
-            Keys.inlineCompletionDelayMilliseconds: 200.0,
-            Keys.inlineCompletionMaximumLines: 1,
-            Keys.promptExpansionInstruction: "在不改变原意的前提下，重写并扩写以下 prompt；只输出最终 prompt，不要解释。",
+            Keys.inlineCompletionDelayMilliseconds: Self.defaultInlineCompletionDelayMilliseconds,
+            Keys.inlineCompletionMaximumLines: Self.defaultInlineCompletionMaximumLines,
         ])
 
-        language = CueLanguage(
-            rawValue: Self.defaults.string(forKey: Keys.language) ?? "system"
+        let selectedLanguage = CueLanguage(
+            rawValue: defaults.string(forKey: Keys.language) ?? CueLanguage.system.rawValue
         ) ?? .system
-        let storedWidth = Self.defaults.double(forKey: Keys.windowWidth)
-        windowWidth = min(max(storedWidth, 420), 1_200)
-        let storedHeight = Self.defaults.double(forKey: Keys.windowHeight)
-        windowHeight = min(max(storedHeight, Self.minimumWindowHeight), 800)
+        language = selectedLanguage
+        let storedWidth = defaults.double(forKey: Keys.windowWidth)
+        windowWidth = min(max(storedWidth, Self.minimumWindowWidth), Self.maximumWindowWidth)
+        let storedHeight = defaults.double(forKey: Keys.windowHeight)
+        windowHeight = min(max(storedHeight, Self.minimumWindowHeight), Self.maximumWindowHeight)
         overflowBehavior = CueOverflowBehavior(
-            rawValue: Self.defaults.string(forKey: Keys.overflowBehavior) ?? "scrollable"
+            rawValue: defaults.string(forKey: Keys.overflowBehavior) ?? "scrollable"
         ) ?? .scrollable
-        editorFontName = Self.defaults.string(forKey: Keys.editorFontName) ?? Self.defaultEditorFont.fontName
-        let storedFontSize = Self.defaults.double(forKey: Keys.editorFontSize)
+        editorFontName = defaults.string(forKey: Keys.editorFontName) ?? Self.defaultEditorFont.fontName
+        let storedFontSize = defaults.double(forKey: Keys.editorFontSize)
         editorFontSize = min(max(storedFontSize, Self.minimumEditorFontSize), Self.maximumEditorFontSize)
-        insertsSpacesBetweenChineseAndEnglish = Self.defaults.bool(forKey: Keys.insertsSpacesBetweenChineseAndEnglish)
-        inlineCompletionEnabled = Self.defaults.bool(forKey: Keys.inlineCompletionEnabled)
-        inlineCompletionTriggerMode = InlineCompletionTriggerMode(rawValue: Self.defaults.string(forKey: Keys.inlineCompletionTriggerMode) ?? "automatic") ?? .automatic
-        inlineCompletionDelayMilliseconds = min(max(Self.defaults.double(forKey: Keys.inlineCompletionDelayMilliseconds), 0), 5_000)
-        inlineCompletionMaximumLines = min(max(Self.defaults.integer(forKey: Keys.inlineCompletionMaximumLines), 1), 100)
-        promptExpansionModel = Self.defaults.string(forKey: Keys.promptExpansionModel)
-        let selectedLocalization = CueLanguage(
-            rawValue: Self.defaults.string(forKey: Keys.language) ?? CueLanguage.system.rawValue
-        )?.localizationIdentifier
-        let localizedDefaultRewritePrompt = CueLocalization.string(
-            .settingsAIRewriteDefaultPrompt,
-            localization: selectedLocalization
+        insertsSpacesBetweenChineseAndEnglish = defaults.bool(forKey: Keys.insertsSpacesBetweenChineseAndEnglish)
+        inlineCompletionEnabled = defaults.bool(forKey: Keys.inlineCompletionEnabled)
+        inlineCompletionTriggerMode = InlineCompletionTriggerMode(
+            rawValue: defaults.string(forKey: Keys.inlineCompletionTriggerMode) ?? InlineCompletionTriggerMode.manual.rawValue
+        ) ?? .manual
+        inlineCompletionDelayMilliseconds = min(
+            max(defaults.double(forKey: Keys.inlineCompletionDelayMilliseconds), 0),
+            Self.maximumInlineCompletionDelayMilliseconds
         )
+        inlineCompletionMaximumLines = min(
+            max(defaults.integer(forKey: Keys.inlineCompletionMaximumLines), 1),
+            Self.maximumInlineCompletionLines
+        )
+        promptExpansionModel = defaults.string(forKey: Keys.promptExpansionModel)
         // A stored instruction is user data, including a prior default that a
         // user may have edited; never replace it during an application update.
-        promptExpansionInstruction = Self.defaults.string(forKey: Keys.promptExpansionInstruction)
-            ?? localizedDefaultRewritePrompt
-        inlineCompletionModel = Self.defaults.string(forKey: Keys.inlineCompletionModel)
+        promptExpansionInstruction = defaults.string(forKey: Keys.promptExpansionInstruction)
+            ?? Self.defaultPromptInstruction(for: selectedLanguage)
+        inlineCompletionModel = defaults.string(forKey: Keys.inlineCompletionModel)
         inlineCompletionKeyConfigured = (try? CueAPIKeyStore.loadDeepSeekAPIKey()) != nil
-        toggleShortcut = Self.loadShortcut(key: Keys.toggleShortcut, fallback: .toggleDefault)
-        previousShortcut = Self.loadShortcut(key: Keys.previousShortcut, fallback: .previousDefault)
-        nextShortcut = Self.loadShortcut(key: Keys.nextShortcut, fallback: .nextDefault)
+        toggleShortcut = Self.loadShortcut(
+            from: defaults,
+            key: Keys.toggleShortcut,
+            fallback: .toggleDefault
+        )
+        previousShortcut = Self.loadShortcut(
+            from: defaults,
+            key: Keys.previousShortcut,
+            fallback: .previousDefault
+        )
+        nextShortcut = Self.loadShortcut(
+            from: defaults,
+            key: Keys.nextShortcut,
+            fallback: .nextDefault
+        )
         inlineCompletionShortcut = Self.loadShortcut(
+            from: defaults,
             key: Keys.inlineCompletionShortcut,
             fallback: .inlineCompletionDefault
         )
-        inlineCompletionAcceptShortcut = Self.loadShortcut(key: Keys.inlineCompletionAcceptShortcut, fallback: CueShortcut(keyCode: 48, modifiers: 0))
-        promptExpansionShortcut = Self.loadShortcut(key: Keys.promptExpansionShortcut, fallback: .promptExpansionDefault)
+        inlineCompletionAcceptShortcut = Self.loadShortcut(
+            from: defaults,
+            key: Keys.inlineCompletionAcceptShortcut,
+            fallback: .inlineCompletionAcceptDefault
+        )
+        promptExpansionShortcut = Self.loadShortcut(
+            from: defaults,
+            key: Keys.promptExpansionShortcut,
+            fallback: .promptExpansionDefault
+        )
         piIntegrationState = piIntegrationService.state()
         if inlineCompletionEnabled { refreshDeepSeekModelsIfPossible() }
     }
@@ -438,6 +489,25 @@ final class CueSettings: ObservableObject {
         setInlineCompletionStatus(key, style: .error)
     }
 
+    func expandPrompt(_ text: String) async throws -> String? {
+        guard let apiKey = try CueAPIKeyStore.loadDeepSeekAPIKey(),
+              let model = promptExpansionModel
+        else { return nil }
+        do {
+            let expanded = try await deepSeekService.expandPrompt(
+                text,
+                instruction: promptExpansionInstruction,
+                model: model,
+                apiKey: apiKey
+            )
+            inlineCompletionStatus = nil
+            return expanded
+        } catch {
+            setInlineCompletionStatus(.settingsInlineCompletionUnavailable, style: .error)
+            throw error
+        }
+    }
+
     private func setInlineCompletionStatus(
         _ key: CueLocalizedKey,
         style: InlineCompletionStatus.Style = .information
@@ -454,10 +524,14 @@ final class CueSettings: ObservableObject {
 
     private func save(_ shortcut: CueShortcut, key: String) {
         guard let data = try? JSONEncoder().encode(shortcut) else { return }
-        Self.defaults.set(data, forKey: key)
+        defaults.set(data, forKey: key)
     }
 
-    private static func loadShortcut(key: String, fallback: CueShortcut) -> CueShortcut {
+    private static func loadShortcut(
+        from defaults: UserDefaults,
+        key: String,
+        fallback: CueShortcut
+    ) -> CueShortcut {
         guard let data = defaults.data(forKey: key),
               let shortcut = try? JSONDecoder().decode(CueShortcut.self, from: data)
         else { return fallback }

@@ -12,6 +12,14 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 - 新增 Pi integration 安装/修复/卸载：可将 Cue 管理的全局 Pi 扩展安装到 `~/.pi/agent/extensions/pi-cue-context`（或 `PI_CODING_AGENT_DIR` 指定目录），并提供 Pi `externalEditor = "cue --wait"` 的可复制配置指引；Cue 不会自动修改 Pi 设置。
 - 未安装 Pi integration 时，内联补全开关保留原用户设置但不可启用，并显示原因。
 
+### 修复
+
+- Release app 现在包含 Pi integration 资源，并在 CI 中校验包内字节与源码一致。
+- Pi integration 只信任精确的托管文件集合；额外文件、符号链接或伪造 manifest 均只读，卸载不会删除未验证内容。
+- Usage archive 重写会保留受支持 schema 中的未知顶层字段和 record 字段。
+- 设置默认值、窗口约束与快捷键默认值改为共享定义，修复英文环境首次启动可能得到中文 AI 重写提示词的问题。
+- 源码安装不再导出并整体导入 `UserDefaults` domain，避免覆盖安装期间产生的用户设置修改。
+
 ## [0.3.1] - 2026-08-04
 
 ### 变更
