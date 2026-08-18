@@ -167,7 +167,7 @@ open "build/Cue Notchpad.app"
 RELEASE_VERSION=0.1.0 BUILD_NUMBER=1 make release-preflight
 ```
 
-产物位于 `dist/`。正式发布工作流使用同一个 `release-preflight` 入口，只构建一次 ZIP，校验 GitHub asset digest 后发布 immutable release，并使用同一 digest 创建 Homebrew Tap 更新 PR。完整发布检查清单见 [`Docs/releasing.md`](Docs/releasing.md)。
+产物位于 `dist/`。正式发布工作流使用同一个 `release-preflight` 入口，只构建一次 ZIP，校验 GitHub asset digest 后发布 immutable release。发布成功后，可单独运行 Homebrew Cask workflow，以该正式 asset 的 digest 创建 Tap 更新 PR。完整流程见 [`Docs/releasing.md`](Docs/releasing.md)。
 
 ## 从源码安装
 

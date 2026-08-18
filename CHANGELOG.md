@@ -7,6 +7,8 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 
 ## [未发布]
 
+## [0.4.0] - 2026-08-19
+
 ### 新增
 
 - AI 重写新增多 Provider 支持：内置 DeepSeek、OpenAI、Anthropic、Google Gemini、OpenRouter、Moonshot AI CN、Z.AI、MiniMax、Xiaomi MiMo、Ant Ling、阿里云百炼、火山方舟、腾讯混元、百度千帆、SiliconFlow、MiniMax Token Plan CN、Xiaomi MiMo Token Plan CN，以及 OpenCode、Azure OpenAI、Vertex AI、Bedrock、Together、Fireworks、Groq、Hugging Face、NVIDIA、Vercel、Cloudflare 与 xAI 等平台；另可配置自定义 Provider。
@@ -95,6 +97,7 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 - 使用本地 `cl100k_base` 词表计算 token，不发送网络请求。
 - 添加 Cue Notchpad 应用图标。
 
+[0.4.0]: https://github.com/haotzops/cue-notchpad/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/haotzops/cue-notchpad/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/haotzops/cue-notchpad/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/haotzops/cue-notchpad/compare/v0.1.0...v0.2.0

@@ -1,0 +1,111 @@
+name: Update Homebrew Cask
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published Cue Notchpad version to package, without the v prefix
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homebrew-cask-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  HOMEBREW_TAP: haotzops/tap
+  HOMEBREW_TAP_REPOSITORY: haotzops/homebrew-tap
+
+jobs:
+  update:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Resolve published release asset
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || {
+            echo "Invalid version: $VERSION" >&2
+            exit 2
+          }
+
+          tag="v$VERSION"
+          archive="Cue-Notchpad-$VERSION-macOS-arm64.zip"
+          [[ "$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" == "false" ]]
+          [[ "$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isImmutable --jq '.isImmutable')" == "true" ]]
+          digest="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq ".assets[] | select(.name == \"$archive\") | .digest")"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "Release asset digest is missing or invalid: $digest" >&2
+            exit 1
+          }
+
+          echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "RELEASE_SHA256=${digest#sha256:}" >> "$GITHUB_ENV"
+
+      - name: Verify Homebrew Tap access
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$GH_TOKEN" ]] || {
+            echo 'HOMEBREW_TAP_TOKEN is required to update the Homebrew Cask.' >&2
+            exit 1
+          }
+          [[ "$(gh api "repos/$HOMEBREW_TAP_REPOSITORY" --jq '.permissions.push')" == "true" ]]
+
+      - name: Validate Homebrew Cask against the published asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap "$HOMEBREW_TAP"
+          tap_dir="$(brew --repository "$HOMEBREW_TAP")"
+          branch="cue-notchpad-v$RELEASE_VERSION-$GITHUB_RUN_ID"
+          git -C "$tap_dir" fetch origin main
+          git -C "$tap_dir" checkout -B "$branch" origin/main
+
+          ./Scripts/render-homebrew-cask.sh \
+            "$RELEASE_VERSION" "$RELEASE_SHA256" "$tap_dir/Casks/cue-notchpad.rb"
+          ruby -c "$tap_dir/Casks/cue-notchpad.rb"
+          git -C "$tap_dir" diff --check
+          brew audit --cask --strict "$HOMEBREW_TAP/cue-notchpad"
+          brew install --cask "$HOMEBREW_TAP/cue-notchpad"
+          cue_command="$(brew --prefix)/bin/cue"
+          [[ -x "$cue_command" ]]
+          set +e
+          "$cue_command" --invalid-option >/dev/null 2>&1
+          status=$?
+          set -e
+          [[ "$status" -eq 64 ]]
+          brew uninstall --cask "$HOMEBREW_TAP/cue-notchpad"
+
+          echo "HOMEBREW_TAP_DIR=$tap_dir" >> "$GITHUB_ENV"
+          echo "HOMEBREW_TAP_BRANCH=$branch" >> "$GITHUB_ENV"
+
+      - name: Open Homebrew Tap pull request
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C "$HOMEBREW_TAP_DIR" config user.name github-actions[bot]
+          git -C "$HOMEBREW_TAP_DIR" config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C "$HOMEBREW_TAP_DIR" add Casks/cue-notchpad.rb
+          git -C "$HOMEBREW_TAP_DIR" commit -m "chore(cask): 更新 Cue Notchpad v$RELEASE_VERSION"
+          gh auth setup-git
+          git -C "$HOMEBREW_TAP_DIR" push --set-upstream origin "$HOMEBREW_TAP_BRANCH"
+          gh pr create \
+            --repo "$HOMEBREW_TAP_REPOSITORY" \
+            --base main \
+            --head "$HOMEBREW_TAP_BRANCH" \
+            --title "chore(cask): 更新 Cue Notchpad v$RELEASE_VERSION" \
+            --body "使用已发布且通过 digest 校验的 Cue Notchpad v$RELEASE_VERSION arm64 资产更新 Cask。"
