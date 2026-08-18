@@ -25,11 +25,10 @@ TAG="v$VERSION"
 
 ## 2. 本地预检
 
-运行测试并生成 arm64 预检包。本地产物用于验证构建与安装链路，不得将其 checksum 写入 Cask；tag workflow 会在受控 job 中构建一次正式 ZIP，GitHub Release、Actions artifact 和 Homebrew 都引用该正式产物。`make release` 是本地 Release 预检，不是正式发布：
+正式发版前使用候选安装入口完成本地人工验收。`make install-rc` 会调用共享的 `release-preflight` 门禁，执行源码校验、debug 构建与全部测试，只生成并验证一次 arm64 候选包，然后安装这份 ZIP。只需生成资产而不安装时，改用 `make release-preflight`。本地产物不得将其 checksum 写入 Cask；tag workflow 使用同一个 preflight 入口在受控 job 中构建正式 ZIP，GitHub Release、Actions artifact 和 Homebrew 都引用该正式产物。这两个命令都不会上传或发布内容：
 
 ```bash
-make test
-RELEASE_VERSION="$VERSION" BUILD_NUMBER=1 make release
+RELEASE_VERSION="$VERSION" BUILD_NUMBER=1 make install-rc
 ```
 
 检查 ZIP、校验值与 provenance：
@@ -48,16 +47,7 @@ lipo -archs "Cue Notchpad.app/Contents/MacOS/cue-host"
 codesign --verify --deep --strict --verbose=2 "Cue Notchpad.app"
 ```
 
-安装并验证这个已生成的预检产物：
-
-```bash
-RELEASE_ARCHIVE="dist/Cue-Notchpad-$VERSION-macOS-arm64.zip" \
-  APP_DIR="$HOME/Applications" BIN_DIR="$HOME/.local/bin" \
-  make install-release
-cue --wait
-```
-
-并确认提交、取消、文件写回、语言切换和设置窗口行为正常。
+候选安装入口已将上述 ZIP 安装到默认开发目录。运行 `cue --wait`，并确认提交、取消、文件写回、语言切换和设置窗口行为正常。需要自定义目录时，在候选安装命令中传入 `APP_DIR` 与 `BIN_DIR`。
 
 ## 3. 创建发布提交和 tag
 
@@ -102,7 +92,7 @@ git push origin "$TAG"
 推送 `v*.*.*` tag 会触发 `.github/workflows/release.yml`。工作流将：
 
 1. 校验 tag、Info.plist、发布说明和 Homebrew Tap 写权限。
-2. 运行测试，只构建一次 arm64 ZIP，并同时保存 ZIP、`SHA256SUMS` 和 `PROVENANCE.json` 为 Actions artifact。
+2. 通过与本地、CI 相同的 `make release-preflight` 门禁，只构建一次 arm64 ZIP，并同时保存 ZIP、`SHA256SUMS` 和 `PROVENANCE.json` 为 Actions artifact。
 3. 创建 Draft Release，上传这三份资产。
 4. 比较本地 SHA-256 与 GitHub 在上传时生成的 asset digest；不一致时保留 Draft 并停止发布。
 5. digest 一致后发布 Release，并确认仓库的 immutable releases 已生效。
@@ -120,7 +110,7 @@ gh release view "$TAG" --json isImmutable,assets
 确认 `isImmutable` 为 `true`，并检查 Release 标题、正文、ZIP、`SHA256SUMS`、`PROVENANCE.json` 与下载链接。使用新浏览器会话或干净用户目录执行一次公开安装：
 
 ```bash
-make install-published-release VERSION="$VERSION"
+make install-release VERSION="$VERSION"
 cue --invalid-option  # 预期退出码 64
 ```
 

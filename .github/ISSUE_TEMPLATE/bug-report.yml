@@ -59,7 +59,7 @@ body:
     id: published-asset-reproduction
     attributes:
       label: 是否已用相同正式资产复现
-      description: 开发者可运行 make install-published-release VERSION=x.y.z；普通用户无需安装开发环境。
+      description: 开发者可运行 make install-release VERSION=x.y.z；普通用户无需安装开发环境。
       options:
         - 是，使用相同 Release ZIP 可以复现
         - 否，使用相同 Release ZIP 无法复现

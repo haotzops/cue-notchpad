@@ -1,12 +1,6 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Version to build without publishing (for example, 0.1.0)
-        required: true
-        default: 0.1.0
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
@@ -26,13 +20,7 @@ jobs:
 
       - name: Resolve version
         shell: bash
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            version="${GITHUB_REF_NAME#v}"
-          else
-            version="${{ inputs.version }}"
-          fi
-          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+        run: echo "RELEASE_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Verify release metadata
         shell: bash
@@ -53,11 +41,8 @@ jobs:
           }
           [[ "$(gh api "repos/$HOMEBREW_TAP_REPOSITORY" --jq '.permissions.push')" == "true" ]]
 
-      - name: Test
-        run: make test
-
-      - name: Build release assets once
-        run: RELEASE_VERSION="$RELEASE_VERSION" BUILD_NUMBER="$GITHUB_RUN_NUMBER" ./Scripts/build-release.sh
+      - name: Run checks and build release assets once
+        run: RELEASE_VERSION="$RELEASE_VERSION" BUILD_NUMBER="$GITHUB_RUN_NUMBER" make release-preflight
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

@@ -19,126 +19,14 @@ concurrency:
 
 jobs:
   validate:
-    name: Build and test
+    name: Development checks and release preflight
     runs-on: macos-26
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Validate source metadata and scripts
+      - name: Run the shared release preflight
         shell: bash
         run: |
-          set -euo pipefail
-          bash -n Scripts/*.sh
-          rendered_cask="$(mktemp /tmp/cue-notchpad.XXXXXX.rb)"
-          ./Scripts/render-homebrew-cask.sh \
-            0.0.0 0000000000000000000000000000000000000000000000000000000000000000 \
-            "$rendered_cask"
-          ruby -c "$rendered_cask"
-          grep -q 'version "0.0.0"' "$rendered_cask"
-          grep -q 'sha256 "0000000000000000000000000000000000000000000000000000000000000000"' "$rendered_cask"
-          rm -f "$rendered_cask"
-          python3 - <<'PY'
-          from pathlib import Path
-          compile(Path("Scripts/generate-tokenizer-index.py").read_text(), "generate-tokenizer-index.py", "exec")
-          PY
-          plutil -lint Supporting/Info.plist
-          plutil -lint Sources/CueCore/Resources/en.lproj/Localizable.strings
-          plutil -lint Sources/CueCore/Resources/zh-Hans.lproj/Localizable.strings
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Supporting/Info.plist)" = "io.github.haotzops.cue-notchpad"
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          fixtures = Path("Tests/Fixtures/Persistence")
-          for name, version in (("config-v1.json", 1), ("config-v2.json", 2), ("usage-v1.json", 1)):
-              document = json.loads((fixtures / name).read_text())
-              assert document["schemaVersion"] == version, name
-          future_usage = json.loads((fixtures / "usage-future.json").read_text())
-          future_config = json.loads((fixtures / "config-future.json").read_text())
-          corrupt_v2 = json.loads((fixtures / "config-v2-corrupt-provider-keys.json").read_text())
-          assert future_usage["schemaVersion"] > 1
-          assert future_config["schemaVersion"] > 2
-          assert corrupt_v2["schemaVersion"] == 2
-          assert not isinstance(corrupt_v2["providerAPIKeys"], dict)
-          for name in ("config-corrupt.json", "usage-corrupt.json"):
-              try:
-                  json.loads((fixtures / name).read_text())
-              except json.JSONDecodeError:
-                  pass
-              else:
-                  raise AssertionError(f"{name} must remain corrupt")
-          PY
-
-      - name: Build debug products
-        run: swift build
-
-      - name: Run core test suite
-        run: make test
-
-      - name: Build and validate release app bundle
-        shell: bash
-        run: |
-          set -euo pipefail
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Supporting/Info.plist)"
-          RELEASE_VERSION="$version" BUILD_NUMBER="$GITHUB_RUN_NUMBER" make app-release
-          app="build/Cue Notchpad.app"
-          plutil -lint "$app/Contents/Info.plist"
-          codesign --verify --deep --strict --verbose=2 "$app"
-          test -f "$app/Contents/Resources/cue-logo.icns"
-          test -f "$app/Contents/Resources/ThirdPartyNotices.txt"
-          test -f "$app/Contents/Resources/LICENSE.txt"
-          test -f "$app/Contents/Resources/index.ts"
-          cmp Sources/CueCore/Resources/PiIntegration/pi-cue-context/index.ts \
-            "$app/Contents/Resources/index.ts"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = "io.github.haotzops.cue-notchpad"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = "$GITHUB_RUN_NUMBER"
-          python3 - "$app/Contents/Resources/BuildInfo.json" "$version" "$GITHUB_RUN_NUMBER" <<'PY'
-          import json
-          from pathlib import Path
-          import sys
-          document = json.loads(Path(sys.argv[1]).read_text())
-          assert document["schemaVersion"] == 1
-          assert document["version"] == sys.argv[2]
-          assert document["buildNumber"] == int(sys.argv[3])
-          assert document["configuration"] == "release"
-          assert document["architectures"] == ["arm64"]
-          PY
-          xcrun lipo -archs "$app/Contents/MacOS/cue" | grep -qw "$(uname -m)"
-          xcrun lipo -archs "$app/Contents/MacOS/cue-host" | grep -qw "$(uname -m)"
-          set +e
-          "$app/Contents/MacOS/cue" --invalid-option >/dev/null 2>&1
-          status=$?
-          set -e
-          test "$status" -eq 64
-
-      - name: Build and validate arm64 release archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Supporting/Info.plist)"
-          RELEASE_VERSION="$version" BUILD_NUMBER="$GITHUB_RUN_NUMBER" make release
-          archive="dist/Cue-Notchpad-$version-macOS-arm64.zip"
-          test -f "$archive"
-          (cd dist && shasum -a 256 -c SHA256SUMS)
-          python3 - dist/PROVENANCE.json "$version" "$GITHUB_RUN_NUMBER" <<'PY'
-          import json
-          from pathlib import Path
-          import sys
-          document = json.loads(Path(sys.argv[1]).read_text())
-          assert document["schemaVersion"] == 1
-          assert document["version"] == sys.argv[2]
-          assert document["buildNumber"] == int(sys.argv[3])
-          assert document["configuration"] == "release"
-          assert document["architectures"] == ["arm64"]
-          PY
-          rm -rf /tmp/cue-release-check
-          mkdir -p /tmp/cue-release-check
-          ditto -x -k "$archive" /tmp/cue-release-check
-          app="/tmp/cue-release-check/Cue Notchpad.app"
-          cmp dist/PROVENANCE.json "$app/Contents/Resources/BuildInfo.json"
-          codesign --verify --deep --strict --verbose=2 "$app"
-          for executable in cue cue-host; do
-            archs="$(xcrun lipo -archs "$app/Contents/MacOS/$executable")"
-            [[ "$archs" == "arm64" ]]
-          done
+          RELEASE_VERSION="$version" BUILD_NUMBER="$GITHUB_RUN_NUMBER" make release-preflight

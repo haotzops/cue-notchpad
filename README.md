@@ -56,7 +56,7 @@ xattr -dr com.apple.quarantine "$HOME/Applications/Cue Notchpad.app"
 请使用 [正式版问题报告](https://github.com/haotzops/cue-notchpad/issues/new?template=bug-report.yml)，附上版本、build number 和 `BuildInfo.json` 或 `PROVENANCE.json`。这些 metadata 不包含用户设置、API Key、prompt 或 Pi message。开发者会先用相同正式资产复现：
 
 ```bash
-make install-published-release VERSION=x.y.z
+make install-release VERSION=x.y.z
 ```
 
 ## 使用
@@ -146,33 +146,28 @@ xcode-select --install
 ```bash
 git clone https://github.com/haotzops/cue-notchpad.git
 cd cue-notchpad
-make test
+make check
 make app
 open "build/Cue Notchpad.app"
 ```
 
-`make build`、`make app` 与 `make install` 是 debug 开发入口；`make build-release`、`make app-release` 与 `make install-app-release` 显式生成本地 Release 候选。两类 app 均默认构建 arm64 并输出到 `build/Cue Notchpad.app`。正式 Release 只能由 tag workflow 构建和发布。
-构建脚本支持以下环境变量：
+`make check` 是本地开发的统一质量门禁：校验脚本与源码 metadata、构建 debug products，并运行全部测试。需要更细粒度操作时，可单独使用 `make build`、`make test`、`make app` 或 `make install`；这些入口始终生成 debug 开发构建。
+
+`make release-preflight` 是本地、CI 与 tag workflow 共用的发布前门禁：先执行 `make check`，然后只构建一次本地 Release 候选 ZIP，并验证 checksum、provenance、app metadata、签名、架构、资源和 CLI smoke test。该命令不会上传或发布任何内容；正式 Release 只能由 `v*.*.*` tag workflow 发布。运行 `make help` 可查看完整命令分组。
+
+发布预检支持以下变量：
 
 - `RELEASE_VERSION`：写入 `CFBundleShortVersionString`，默认读取 `Supporting/Info.plist`。
-- `BUILD_NUMBER`：写入 `CFBundleVersion`，必须是正整数，默认读取 `Supporting/Info.plist`。
-- `ARCHS`：目标架构；默认是 `arm64`。Release 固定只构建 `arm64`。
-- `CONFIGURATION`：`debug` 或 `release`，默认 `debug`；Release 打包脚本始终使用 `release`。
-- `OUTPUT_DIR`：app bundle 输出目录，默认 `build`。
+- `BUILD_NUMBER`：写入 `CFBundleVersion`，必须是正整数，默认值为 `1`。
+- `DIST_DIR`：候选资产输出目录，默认 `dist`。
 
-构建版本号为 `0.1.0`、构建号为 `7` 的本地 Release 候选：
+执行完整发布预检，准备本地 Release 候选 ZIP、SHA-256 与 provenance，但不进行上传或发布：
 
 ```bash
-RELEASE_VERSION=0.1.0 BUILD_NUMBER=7 ARCHS=arm64 make app-release
+RELEASE_VERSION=0.1.0 BUILD_NUMBER=1 make release-preflight
 ```
 
-准备本地 Release 预检 ZIP、SHA-256 与 provenance，但不进行上传或发布：
-
-```bash
-RELEASE_VERSION=0.1.0 BUILD_NUMBER=1 make release
-```
-
-产物位于 `dist/`。正式发布工作流只构建一次 ZIP，校验 GitHub asset digest 后发布 immutable release，并使用同一 digest 创建 Homebrew Tap 更新 PR。完整发布检查清单见 [`Docs/releasing.md`](Docs/releasing.md)。
+产物位于 `dist/`。正式发布工作流使用同一个 `release-preflight` 入口，只构建一次 ZIP，校验 GitHub asset digest 后发布 immutable release，并使用同一 digest 创建 Homebrew Tap 更新 PR。完整发布检查清单见 [`Docs/releasing.md`](Docs/releasing.md)。
 
 ## 从源码安装
 
@@ -208,20 +203,21 @@ make uninstall
 APP_DIR=/Applications BIN_DIR=/usr/local/bin make uninstall
 ```
 
-如果需要安装与 GitHub Release、Homebrew 完全相同的二进制，不要重新本机构建，直接安装 Release ZIP：
+发版前需要安装并人工验收本地候选资产时，运行：
 
 ```bash
-make install-release \
-  RELEASE_ARCHIVE=/path/to/Cue-Notchpad-<version>-macOS-arm64.zip
+RELEASE_VERSION=0.3.2 BUILD_NUMBER=1 make install-rc
 ```
 
-`make install` 安装 debug 开发构建；`make install-app-release` 安装本地 Release 候选；`make install-release` 安装已下载并校验的 ZIP。为精确复现用户正在运行的公开版本，可让 Make 下载指定的正式资产、校验其官方 `SHA256SUMS` 后安装：
+该命令会执行完整 `release-preflight`，生成并验证候选 ZIP，然后安装这份 ZIP；它不会上传或发布任何内容。
+
+为精确复现用户正在运行的公开版本，下载指定正式资产、校验其官方 `SHA256SUMS` 后安装：
 
 ```bash
-make install-published-release VERSION=0.3.1
+make install-release VERSION=0.3.1
 ```
 
-该命令不会从源码重建；它安装的 ZIP 与用户下载的正式 Release 相同。每个 app bundle 的 `Contents/Resources/BuildInfo.json` 和 Release 附带的 `PROVENANCE.json` 记录版本、构建号、源码 revision、配置、架构及工具链信息。
+该命令不会从源码重建；它安装的 ZIP 与用户下载的正式 Release 相同。因此公开安装入口仅对应三种情境：`make install` 用于 debug 开发，`make install-rc` 用于候选验收，`make install-release` 用于正式版复现。每个 app bundle 的 `Contents/Resources/BuildInfo.json` 和 Release 附带的 `PROVENANCE.json` 记录版本、构建号、源码 revision、配置、架构及工具链信息。
 
 ## 在源码版与 Homebrew 版之间切换
 

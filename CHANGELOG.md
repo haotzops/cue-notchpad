@@ -20,6 +20,10 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 - 主窗口默认尺寸调整为 600×150，并新增仅限底边的自由拉伸与“锁定窗口”设置；左右边始终不可拉伸。
 - 新增 Pi integration 安装/修复/卸载：可将 Cue 管理的全局 Pi 扩展安装到 `~/.pi/agent/extensions/pi-cue-context`（或 `PI_CODING_AGENT_DIR` 指定目录），并提供 Pi `externalEditor = "cue --wait"` 的可复制配置指引；Cue 不会自动修改 Pi 设置。
 
+### 变更
+
+- 本地开发统一使用 `make check`，发布前统一使用 `make release-preflight`；公开安装入口收敛为 debug 开发、候选验收和正式版复现三种，本地、CI 与 tag workflow 共享源码检查和候选资产验证，正式发布仍只能由版本 tag 触发。
+
 ### 移除
 
 - 移除 DeepSeek FIM 行间补全、ghost text、自动/手动触发、Tab 接受和相关快捷键；Cue 的 AI 能力收敛为用户显式触发的 Chat Completion 重写。
