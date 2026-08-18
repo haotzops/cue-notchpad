@@ -7,70 +7,111 @@ struct CueGeneralSettingsView: View {
     @State private var isConfirmingRestoreAll = false
 
     var body: some View {
-        Section {
-            Picker(settings.localized(.settingsLanguage), selection: $settings.language) {
-                Text(settings.localized(.settingsLanguageSystem)).tag(CueLanguage.system)
-                Text(settings.localized(.languageEnglish)).tag(CueLanguage.english)
-                Text(settings.localized(.languageSimplifiedChinese)).tag(CueLanguage.simplifiedChinese)
-            }
+        VStack(spacing: 18) {
+            applicationCard
+            windowCard
+            editorCard
+            resetCard
+        }
+    }
 
-            HStack(spacing: 8) {
-                Text(settings.localized(.settingsWindowSize))
-                Spacer(minLength: 0)
-                dimensionField(
-                    settings.localized(.settingsWidth),
-                    value: $settings.windowWidth,
-                    range: CueSettings.minimumWindowWidth ... CueSettings.maximumWindowWidth
-                )
-                Text("×")
-                    .foregroundStyle(.secondary)
-                dimensionField(
-                    settings.localized(.settingsHeight),
-                    value: $settings.windowHeight,
-                    range: CueSettings.minimumWindowHeight ... CueSettings.maximumWindowHeight
-                )
-                Button {
-                    settings.windowWidth = CueSettings.defaultWindowWidth
-                    settings.windowHeight = CueSettings.defaultWindowHeight
-                } label: {
-                    Image(systemName: "arrow.counterclockwise")
+    private var applicationCard: some View {
+        CueSettingsCard(settings.localized(.settingsGeneral)) {
+            CueSettingsRow(
+                settings.localized(.settingsLanguage),
+                systemImage: "globe"
+            ) {
+                Picker("", selection: $settings.language) {
+                    Text(settings.localized(.settingsLanguageSystem)).tag(CueLanguage.system)
+                    Text(settings.localized(.languageEnglish)).tag(CueLanguage.english)
+                    Text(settings.localized(.languageSimplifiedChinese)).tag(CueLanguage.simplifiedChinese)
                 }
-                .help(settings.localized(.settingsRestoreDefaultWindowSize))
-                .disabled(settings.normalizedWidth == CueSettings.defaultWindowWidth && settings.normalizedHeight == CueSettings.defaultWindowHeight)
+                .labelsHidden()
             }
 
-            editorAppearanceSettings
-        }
-
-        Text(settings.localized(.settingsSizeHint))
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-
-        Section(settings.localized(.settingsResetAndData)) {
-            settingsActions
+            CueSettingsRow(
+                settings.localized(.settingsChineseEnglishSpacing),
+                detail: settings.localized(.settingsChineseEnglishSpacingHint),
+                systemImage: "textformat"
+            ) {
+                Toggle("", isOn: $settings.insertsSpacesBetweenChineseAndEnglish)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
         }
     }
 
-    private var editorFontDisplayName: String {
-        let systemFontName = NSFont.systemFont(ofSize: CGFloat(CueSettings.defaultEditorFontSize)).fontName
-        guard settings.editorFont.fontName == systemFontName else {
-            return settings.editorFont.displayName ?? settings.editorFont.fontName
+    private var windowCard: some View {
+        CueSettingsCard(settings.localized(.settingsWindowSize)) {
+            CueSettingsRow(
+                "\(settings.localized(.settingsWidth)) × \(settings.localized(.settingsHeight))",
+                detail: settings.localized(.settingsSizeHint),
+                systemImage: "macwindow"
+            ) {
+                HStack(spacing: 8) {
+                    dimensionField(value: $settings.windowWidth)
+                    Text("×")
+                        .foregroundStyle(.tertiary)
+                    dimensionField(value: $settings.windowHeight)
+                    Button {
+                        settings.windowWidth = CueSettings.defaultWindowWidth
+                        settings.windowHeight = CueSettings.defaultWindowHeight
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                    }
+                    .help(settings.localized(.settingsRestoreDefaultWindowSize))
+                    .disabled(
+                        settings.normalizedWidth == CueSettings.defaultWindowWidth
+                            && settings.normalizedHeight == CueSettings.defaultWindowHeight
+                    )
+                }
+            }
+
+            CueSettingsRow(
+                settings.localized(.settingsLockWindow),
+                detail: settings.localized(.settingsLockWindowHint),
+                systemImage: settings.locksPromptWindow ? "lock.fill" : "lock.open"
+            ) {
+                Toggle("", isOn: $settings.locksPromptWindow)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+
+            CueSettingsRow(
+                settings.localized(.settingsOverflowBehavior),
+                systemImage: "arrow.up.and.down.text.horizontal"
+            ) {
+                Picker("", selection: $settings.overflowBehavior) {
+                    Text(settings.localized(.settingsOverflowScrollable))
+                        .tag(CueOverflowBehavior.scrollable)
+                    Text(settings.localized(.settingsOverflowGrow))
+                        .tag(CueOverflowBehavior.growWithContent)
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
         }
-        return settings.localized(.settingsSystemFontRegular)
     }
 
-    private var editorAppearanceSettings: some View {
-        Group {
-            LabeledContent(settings.localized(.settingsEditorFont)) {
+    private var editorCard: some View {
+        CueSettingsCard(settings.localized(.settingsEditor)) {
+            CueSettingsRow(
+                settings.localized(.settingsEditorFont),
+                systemImage: "textformat.size"
+            ) {
                 HStack(spacing: 8) {
                     Text(editorFontDisplayName)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                        .frame(maxWidth: 180, alignment: .trailing)
                         .help(settings.editorFont.fontName)
-                    Spacer(minLength: 8)
                     CueEditorFontPicker(
                         title: settings.localized(.settingsChooseFont),
-                        font: Binding(get: { settings.editorFont }, set: { settings.setEditorFont($0) })
+                        font: Binding(
+                            get: { settings.editorFont },
+                            set: { settings.setEditorFont($0) }
+                        )
                     )
                     Button { settings.restoreDefaultEditorFont() } label: {
                         Image(systemName: "arrow.counterclockwise")
@@ -78,15 +119,20 @@ struct CueGeneralSettingsView: View {
                     .help(settings.localized(.settingsRestoreDefaultFont))
                 }
             }
-            LabeledContent(settings.localized(.settingsEditorFontSize)) {
-                HStack(spacing: 5) {
+
+            CueSettingsRow(
+                settings.localized(.settingsEditorFontSize),
+                detail: settings.localized(.settingsEditorFontSizeHint),
+                systemImage: "character.cursor.ibeam"
+            ) {
+                HStack(spacing: 6) {
                     TextField(
                         "",
                         value: $settings.editorFontSize,
                         format: .number.precision(.fractionLength(0))
                     )
                     .multilineTextAlignment(.trailing)
-                    .frame(width: 46)
+                    .frame(width: 48)
                     Text(settings.localized(.unitPoints))
                         .foregroundStyle(.secondary)
                     Stepper(
@@ -98,26 +144,26 @@ struct CueGeneralSettingsView: View {
                     .labelsHidden()
                 }
             }
-            .help(settings.localized(.settingsEditorFontSizeHint))
-            Toggle(
-                settings.localized(.settingsChineseEnglishSpacing),
-                isOn: $settings.insertsSpacesBetweenChineseAndEnglish
-            )
-            .help(settings.localized(.settingsChineseEnglishSpacingHint))
-
-            Picker(settings.localized(.settingsOverflowBehavior), selection: $settings.overflowBehavior) {
-                Text(settings.localized(.settingsOverflowScrollable))
-                    .tag(CueOverflowBehavior.scrollable)
-                Text(settings.localized(.settingsOverflowGrow))
-                    .tag(CueOverflowBehavior.growWithContent)
-            }
-            .pickerStyle(.segmented)
         }
     }
 
-    private var settingsActions: some View {
-        VStack(spacing: 10) {
-            LabeledContent {
+    private var resetCard: some View {
+        CueSettingsCard(settings.localized(.settingsResetAndData)) {
+            HStack(spacing: 14) {
+                Image(systemName: "arrow.counterclockwise.circle")
+                    .font(.system(size: 19))
+                    .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(settings.localized(.settingsRestoreAll))
+                    Text(settings.localized(.settingsRestoreAllDetail))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 20)
+
                 Button(settings.localized(.settingsRestore)) {
                     isConfirmingRestoreAll = true
                 }
@@ -131,43 +177,32 @@ struct CueGeneralSettingsView: View {
                     }
                     Button(settings.localized(.settingsCancel), role: .cancel) {}
                 }
-            } label: {
-                actionDescription(
-                    title: settings.localized(.settingsRestoreAll),
-                    detail: settings.localized(.settingsRestoreAllDetail)
-                )
             }
         }
     }
 
-    private func actionDescription(title: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-            Text(detail)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+    private var editorFontDisplayName: String {
+        let systemFontName = NSFont.systemFont(
+            ofSize: CGFloat(CueSettings.defaultEditorFontSize)
+        ).fontName
+        guard settings.editorFont.fontName == systemFontName else {
+            return settings.editorFont.displayName ?? settings.editorFont.fontName
         }
+        return settings.localized(.settingsSystemFontRegular)
     }
 
-    private func dimensionField(
-        _: String,
-        value: Binding<Double>,
-        range: ClosedRange<Double>
-    ) -> some View {
+    private func dimensionField(value: Binding<Double>) -> some View {
         HStack(spacing: 5) {
             TextField("", value: value, format: .number.precision(.fractionLength(0)))
                 .multilineTextAlignment(.trailing)
                 .frame(width: 58)
             Text(settings.localized(.unitPoints))
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: true, vertical: false)
-            Stepper("", value: value, in: range, step: 10)
-                .labelsHidden()
         }
     }
 }
 
-/// Bridges AppKit's shared font panel into the SwiftUI settings form.
+/// Bridges AppKit's shared font panel into the SwiftUI settings surface.
 private struct CueEditorFontPicker: View {
     let title: String
     @Binding var font: NSFont

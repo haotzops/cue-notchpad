@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 2,
+  "deepSeekAPIKey": "legacy-copy-must-survive",
+  "providerAPIKeys": {
+    "deepseek": "deepseek-v2-key",
+    "openai": "openai-v2-key",
+    "minimax-cn": "minimax-plan-v2-key",
+    "groq": "groq-v2-key",
+    "siliconflow": "siliconflow-v2-key"
+  },
+  "futureField": "must-survive-a-supported-write"
+}

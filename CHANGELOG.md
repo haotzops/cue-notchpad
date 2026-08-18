@@ -9,9 +9,15 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 
 ### 新增
 
+- AI 重写新增多 Provider 支持：内置 DeepSeek、OpenAI、Anthropic、Google Gemini、OpenRouter、Moonshot AI CN、Z.AI、MiniMax、Xiaomi MiMo、Ant Ling、阿里云百炼、火山方舟、腾讯混元、百度千帆、SiliconFlow、MiniMax Token Plan CN、Xiaomi MiMo Token Plan CN，以及 OpenCode、Azure OpenAI、Vertex AI、Bedrock、Together、Fireworks、Groq、Hugging Face、NVIDIA、Vercel、Cloudflare 与 xAI 等平台；另可配置自定义 Provider。
+- 新增本地推理 Provider 分类：Ollama、LM Studio、vLLM、llama.cpp、LocalAI、MLX、Jan、GPT4All、KoboldCpp 与 Msty，默认指向本机端口、无需 API Key，支持模型发现与局域网地址覆盖。
+- 新增独立“供应商凭据”设置页：按可折叠类别列出全部 Provider 及其凭据状态，支持统一搜索、行内移除本地凭据和独立滚动的详情配置；“AI”页保留重写提示词与 Pi 集成。
+- Provider API adapter 参考 Pi Coding Agent 分层，支持 OpenAI Responses、OpenAI Chat Completions、Anthropic Messages、Google Generative AI、Azure OpenAI Responses、Google Vertex AI 与 Amazon Bedrock Converse；各 Provider 独立保存凭据，模型和 endpoint 按 `Provider + API` 分离。
+- Provider 选择按官方 API、Token Plan、平台与网关、本地、自定义分组；模型目录可刷新或直接输入 Model ID。仅内置未声明工具白名单、指定场景或专属客户端 OAuth 限制的接入方式。
 - AI 重写提示词支持 `${message}` 变量：由 Pi 启动的 Cue 编辑事务可在任意位置注入 active branch 上最近一个 assistant turn 的文本。
 - Pi integration 使用 session-scoped 私有 Unix socket 与随机 capability 提供单次 message snapshot；普通 Cue 调用和 bridge 失败会安全降级为空变量。
-- 重新设计使用统计页：提供今日/近 7 天/近 30 天/自定义范围、摘要指标、本地活动趋势、空状态和数据清除入口，不新增用户数据采集字段。
+- 重新设计设置窗口与使用统计页：使用侧边栏和统一卡片布局，统计支持日期范围、摘要指标、活动趋势 hover 数值、空状态和数据清除入口，不新增用户数据采集字段。
+- 主窗口默认尺寸调整为 600×150，并新增仅限底边的自由拉伸与“锁定窗口”设置；左右边始终不可拉伸。
 - 新增 Pi integration 安装/修复/卸载：可将 Cue 管理的全局 Pi 扩展安装到 `~/.pi/agent/extensions/pi-cue-context`（或 `PI_CODING_AGENT_DIR` 指定目录），并提供 Pi `externalEditor = "cue --wait"` 的可复制配置指引；Cue 不会自动修改 Pi 设置。
 
 ### 移除
@@ -21,7 +27,8 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 ### 修复
 
 - Release app 现在包含 Pi integration 资源，并在 CI 中校验包内字节与源码一致。
-- Pi message 只在重写提示词明确包含 `${message}` 且用户触发重写时发送；不会显示、落盘、写入 UserDefaults、Usage archive 或日志。
+- Pi message 只在重写提示词明确包含 `${message}` 且用户触发重写时发送给当前所选 Provider；不会显示、落盘、写入 UserDefaults、Usage archive 或日志。
+- API Key config v1 会先保留可恢复备份，再幂等迁移到按 Provider 存储的 schema v2；旧 DeepSeek Key 字段和未知字段保持不变。
 - Pi integration 只信任精确的托管文件集合；额外文件、符号链接或伪造 manifest 均只读，卸载不会删除未验证内容。
 - Usage archive 重写会保留受支持 schema 中的未知顶层字段和 record 字段。
 - 设置默认值、窗口约束与快捷键默认值改为共享定义，修复英文环境首次启动可能得到中文 AI 重写提示词的问题。

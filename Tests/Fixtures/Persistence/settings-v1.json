@@ -1,0 +1,10 @@
+{
+  "cueSettingsSchemaVersion": 1,
+  "language": "en",
+  "windowWidth": 720,
+  "windowHeight": 420,
+  "locksPromptWindow": true,
+  "futureSetting": {
+    "mustRemain": true
+  }
+}

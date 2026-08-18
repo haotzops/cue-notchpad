@@ -1,7 +1,9 @@
+import CueCore
 import Foundation
 
-/// Loads CUE_DEEPSEEK_API_KEY first, then a user-owned local configuration file.
-/// The file is deliberately restricted to the current user (0600); it is not Keychain-backed.
+/// Resolves provider credentials from the provider's environment variables first,
+/// then the user-owned local configuration file. The file remains at the stable
+/// Cue path and is restricted to the current user (0600).
 enum CueAPIKeyStoreError: LocalizedError {
     case unsupportedSchema
     case corruptConfiguration
@@ -16,10 +18,17 @@ enum CueAPIKeyStoreError: LocalizedError {
     }
 }
 
+enum CueAPIKeySource: Equatable {
+    case environment(String)
+    case configuration
+}
+
 enum CueAPIKeyStore {
-    private static let currentSchemaVersion = 1
-    /// Test-only override; production always uses the stable Application Support path.
+    static let currentSchemaVersion = 2
+    /// Test-only overrides; production uses the stable Application Support path
+    /// and the process environment.
     static var configurationURLOverride: URL?
+    static var environmentOverride: [String: String]?
 
     private static var fileURL: URL {
         if let configurationURLOverride { return configurationURLOverride }
@@ -28,52 +37,166 @@ enum CueAPIKeyStore {
         return directory.appendingPathComponent("config.json")
     }
 
-    static func loadDeepSeekAPIKey() throws -> String? {
-        if let value = ProcessInfo.processInfo.environment["CUE_DEEPSEEK_API_KEY"], !value.isEmpty { return value }
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
-        return try configuration(at: fileURL)["deepSeekAPIKey"] as? String
+    private static var versionOneBackupURL: URL {
+        fileURL.deletingLastPathComponent().appendingPathComponent("config.v1.backup.json")
     }
 
-    static func saveDeepSeekAPIKey(_ key: String) throws {
+    static func loadAPIKey(for provider: CueAIProviderID) throws -> String? {
+        try resolveAPIKey(for: provider)?.key
+    }
+
+    static func source(for provider: CueAIProviderID) throws -> CueAPIKeySource? {
+        try resolveAPIKey(for: provider)?.source
+    }
+
+    static func hasStoredAPIKey(for provider: CueAIProviderID) throws -> Bool {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return false }
+        let document = try configuration(at: fileURL)
+        if let keys = try providerKeys(in: document),
+           let key = keys[provider.rawValue] as? String,
+           !key.isEmpty
+        {
+            return true
+        }
+        let version = document["schemaVersion"] as? Int ?? 0
+        return version < currentSchemaVersion
+            && provider == .deepSeek
+            && (document["deepSeekAPIKey"] as? String)?.isEmpty == false
+    }
+
+    static func saveAPIKey(_ key: String, for provider: CueAIProviderID) throws {
+        var document = try writableConfiguration()
+        var keys = try providerKeys(in: document) ?? [:]
+        keys[provider.rawValue] = key
+        document["providerAPIKeys"] = keys
+        try persist(document)
+    }
+
+    static func removeAPIKey(for provider: CueAIProviderID) throws {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        var document = try writableConfiguration()
+        var keys = try providerKeys(in: document) ?? [:]
+        keys.removeValue(forKey: provider.rawValue)
+        document["providerAPIKeys"] = keys
+        try persist(document)
+    }
+
+    private static func resolveAPIKey(
+        for provider: CueAIProviderID
+    ) throws -> (key: String, source: CueAPIKeySource)? {
+        let environment = environmentOverride ?? ProcessInfo.processInfo.environment
+        for environmentKey in provider.environmentKeys {
+            if let value = environment[environmentKey], !value.isEmpty {
+                return (value, .environment(environmentKey))
+            }
+        }
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
+        let document = try configuration(at: fileURL)
+        if let keys = try providerKeys(in: document),
+           let key = keys[provider.rawValue] as? String,
+           !key.isEmpty
+        {
+            return (key, .configuration)
+        }
+        // Schema v1 compatibility. Once a v2 document exists, providerAPIKeys
+        // is authoritative so deleting DeepSeek does not revive this legacy copy.
+        let version = document["schemaVersion"] as? Int ?? 0
+        if version < currentSchemaVersion,
+           provider == .deepSeek,
+           let key = document["deepSeekAPIKey"] as? String,
+           !key.isEmpty
+        {
+            return (key, .configuration)
+        }
+        return nil
+    }
+
+    private static func writableConfiguration() throws -> [String: Any] {
         let directory = fileURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-
-        // Preserve additive fields in supported documents. Future schemas are
-        // read-only so this release can never overwrite unknown data.
-        var document: [String: Any]
-        if FileManager.default.fileExists(atPath: fileURL.path) {
-            document = try configuration(at: fileURL)
-        } else {
-            document = [:]
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            return ["schemaVersion": currentSchemaVersion, "providerAPIKeys": [:]]
         }
+        let sourceData = try Data(contentsOf: fileURL)
+        var document = try configuration(from: sourceData)
         let storedVersion = document["schemaVersion"] as? Int ?? 0
         guard storedVersion <= currentSchemaVersion else {
             throw CueAPIKeyStoreError.unsupportedSchema
         }
-        document["schemaVersion"] = currentSchemaVersion
-        document["deepSeekAPIKey"] = key
-
-        let data = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
-        try data.write(to: fileURL, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+        if storedVersion < currentSchemaVersion {
+            try migrateVersionOne(&document, sourceData: sourceData)
+        } else {
+            _ = try providerKeys(in: document)
+        }
+        return document
     }
 
-    static func removeDeepSeekAPIKey() throws {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        var document = try configuration(at: fileURL)
-        let storedVersion = document["schemaVersion"] as? Int ?? 0
-        guard storedVersion <= currentSchemaVersion else {
-            throw CueAPIKeyStoreError.unsupportedSchema
+    private static func migrateVersionOne(
+        _ document: inout [String: Any],
+        sourceData: Data
+    ) throws {
+        guard (document["schemaVersion"] as? Int ?? 0) == 1 else {
+            throw CueAPIKeyStoreError.corruptConfiguration
         }
-        document.removeValue(forKey: "deepSeekAPIKey")
+        if !FileManager.default.fileExists(atPath: versionOneBackupURL.path) {
+            let temporaryURL = versionOneBackupURL
+                .deletingLastPathComponent()
+                .appendingPathComponent(".config.v1.backup.\(UUID().uuidString).tmp")
+            defer { try? FileManager.default.removeItem(at: temporaryURL) }
+            try sourceData.write(to: temporaryURL, options: .atomic)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: temporaryURL.path
+            )
+            do {
+                // Publishing a hard link is atomic and refuses to overwrite a
+                // backup another Cue process may have created concurrently.
+                try FileManager.default.linkItem(at: temporaryURL, to: versionOneBackupURL)
+            } catch CocoaError.fileWriteFileExists {
+                // Another process completed the same idempotent migration.
+            }
+        }
+        var keys = try providerKeys(in: document) ?? [:]
+        if keys[CueAIProviderID.deepSeek.rawValue] == nil,
+           let legacyKey = document["deepSeekAPIKey"] as? String
+        {
+            keys[CueAIProviderID.deepSeek.rawValue] = legacyKey
+        }
+        document["providerAPIKeys"] = keys
+        document["schemaVersion"] = currentSchemaVersion
+    }
+
+    private static func providerKeys(in document: [String: Any]) throws -> [String: Any]? {
+        guard let value = document["providerAPIKeys"] else { return nil }
+        guard let keys = value as? [String: Any] else {
+            throw CueAPIKeyStoreError.corruptConfiguration
+        }
+        return keys
+    }
+
+    private static func persist(_ document: [String: Any]) throws {
+        guard JSONSerialization.isValidJSONObject(document) else {
+            throw CueAPIKeyStoreError.corruptConfiguration
+        }
         let data = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
         try data.write(to: fileURL, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
     }
 
     private static func configuration(at url: URL) throws -> [String: Any] {
-        let object = try JSONSerialization.jsonObject(with: Data(contentsOf: url))
-        guard let document = object as? [String: Any] else {
+        try configuration(from: Data(contentsOf: url))
+    }
+
+    private static func configuration(from data: Data) throws -> [String: Any] {
+        let object: Any
+        do {
+            object = try JSONSerialization.jsonObject(with: data)
+        } catch {
+            throw CueAPIKeyStoreError.corruptConfiguration
+        }
+        guard let document = object as? [String: Any],
+              document["schemaVersion"] is Int
+        else {
             throw CueAPIKeyStoreError.corruptConfiguration
         }
         return document

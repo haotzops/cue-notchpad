@@ -54,133 +54,151 @@ struct CueUsageStatisticsView: View {
 
     var body: some View {
         let selectedActivity = activity
-        VStack(alignment: .leading, spacing: 16) {
-            periodControls
+        VStack(spacing: 18) {
+            periodCard
             summaryCards(selectedActivity)
-            activitySection(selectedActivity)
-            privacyNote
-            clearAction
+            activityCard(selectedActivity)
+            dataCard
         }
-        .padding(.vertical, 4)
     }
 
-    private var periodControls: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Picker("", selection: $period) {
-                Text(localized(.usageToday)).tag(CueUsagePeriod.day)
-                Text(localized(.usageWeek)).tag(CueUsagePeriod.week)
-                Text(localized(.usageMonth)).tag(CueUsagePeriod.month)
-                Text(localized(.usageCustom)).tag(CueUsagePeriod.custom)
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(maxWidth: .infinity)
-
-            if period == .custom {
-                HStack(spacing: 12) {
-                    DatePicker(
-                        localized(.usageStart),
-                        selection: $customStart,
-                        in: ...Date.now,
-                        displayedComponents: .date
-                    )
-                    DatePicker(
-                        localized(.usageEnd),
-                        selection: $customEnd,
-                        in: ...Date.now,
-                        displayedComponents: .date
-                    )
+    private var periodCard: some View {
+        CueSettingsCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Picker("", selection: $period) {
+                    Text(localized(.usageToday)).tag(CueUsagePeriod.day)
+                    Text(localized(.usageWeek)).tag(CueUsagePeriod.week)
+                    Text(localized(.usageMonth)).tag(CueUsagePeriod.month)
+                    Text(localized(.usageCustom)).tag(CueUsagePeriod.custom)
                 }
-                .datePickerStyle(.compact)
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: .infinity)
+
+                if period == .custom {
+                    HStack(spacing: 18) {
+                        DatePicker(
+                            localized(.usageStart),
+                            selection: $customStart,
+                            in: ...Date.now,
+                            displayedComponents: .date
+                        )
+                        DatePicker(
+                            localized(.usageEnd),
+                            selection: $customEnd,
+                            in: ...Date.now,
+                            displayedComponents: .date
+                        )
+                        Spacer()
+                    }
+                    .datePickerStyle(.compact)
+                }
             }
         }
     }
 
     @ViewBuilder
     private func summaryCards(_ activity: CueUsageActivity) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             UsageMetricCard(
                 title: localized(.usageCueOpens),
                 value: "\(activity.totalOpens)",
-                systemImage: "rectangle.and.pencil.and.ellipsis"
+                systemImage: "rectangle.and.pencil.and.ellipsis",
+                color: .blue
             )
             if activity.dayCount == 1 {
                 UsageMetricCard(
                     title: localized(.usageFirstOpen),
                     value: time(activity.firstOpen),
-                    systemImage: "sunrise.fill"
+                    systemImage: "sunrise.fill",
+                    color: .orange
                 )
                 UsageMetricCard(
                     title: localized(.usageLatestOpen),
                     value: time(activity.latestOpen),
-                    systemImage: "clock.fill"
+                    systemImage: "clock.fill",
+                    color: .purple
                 )
             } else {
                 UsageMetricCard(
                     title: localized(.usageActiveDays),
                     value: "\(activity.activeDays)",
-                    systemImage: "calendar"
+                    systemImage: "calendar",
+                    color: .orange
                 )
                 UsageMetricCard(
                     title: localized(.usageDailyAverage),
                     value: activity.averageOpens.formatted(.number.precision(.fractionLength(1))),
-                    systemImage: "chart.bar.fill"
+                    systemImage: "chart.bar.fill",
+                    color: .purple
                 )
             }
         }
     }
 
-    private func activitySection(_ activity: CueUsageActivity) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(localized(.usageActivity))
-                    .font(.headline)
-                Spacer()
-                Text(activity.rangeLabel(locale: locale))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if activity.totalOpens == 0 {
-                VStack(spacing: 8) {
-                    Image(systemName: "chart.bar.xaxis")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.tertiary)
-                    Text(localized(.usageNoActivity))
-                        .font(.callout.weight(.medium))
-                    Text(localized(.usageNoActivityHint))
+    private func activityCard(_ activity: CueUsageActivity) -> some View {
+        CueSettingsCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(localized(.usageActivity))
+                        .font(.headline)
+                    Spacer()
+                    Text(activity.rangeLabel(locale: locale))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
                 }
-                .frame(maxWidth: .infinity, minHeight: 112)
-                .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
-            } else {
-                UsageActivityChart(activity: activity, locale: locale)
-                    .frame(height: 128)
+
+                if activity.totalOpens == 0 {
+                    VStack(spacing: 8) {
+                        Image(systemName: "chart.bar.xaxis")
+                            .font(.system(size: 26))
+                            .foregroundStyle(.tertiary)
+                        Text(localized(.usageNoActivity))
+                            .font(.callout.weight(.medium))
+                        Text(localized(.usageNoActivityHint))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 138)
+                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
+                } else {
+                    UsageActivityChart(
+                        activity: activity,
+                        locale: locale,
+                        valueLabel: localized(.usageCueOpens)
+                    )
+                    .frame(height: 150)
+                }
             }
         }
     }
 
-    private var privacyNote: some View {
-        Label(localized(.usagePrivacyHint), systemImage: "lock.fill")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
+    private var dataCard: some View {
+        CueSettingsCard {
+            HStack(spacing: 14) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.green)
 
-    private var clearAction: some View {
-        HStack {
-            Text(localized(.settingsClearUsageDetail))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button(localized(.settingsClearUsage), role: .destructive) {
-                isConfirmingUsageClear = true
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(localized(.usagePrivacyHint))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(localized(.settingsClearUsageDetail))
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer(minLength: 18)
+
+                Button(localized(.settingsClearUsage), role: .destructive) {
+                    isConfirmingUsageClear = true
+                }
+                .disabled(usage.cueOpenCount == 0 && usage.records.isEmpty)
             }
-            .disabled(usage.cueOpenCount == 0 && usage.records.isEmpty)
         }
-        .padding(.top, 2)
         .confirmationDialog(
             localized(.settingsClearUsageConfirmation),
             isPresented: $isConfirmingUsageClear,
@@ -211,50 +229,105 @@ private struct UsageMetricCard: View {
     let title: String
     let value: String
     let systemImage: String
+    let color: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(title, systemImage: systemImage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Text(value)
-                .font(.system(size: 24, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .contentTransition(.numericText())
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 34, height: 34)
+                .background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: 9))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(value)
+                    .font(.system(size: 21, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
+        .padding(14)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        }
     }
 }
 
 private struct UsageActivityChart: View {
     let activity: CueUsageActivity
     let locale: Locale
+    let valueLabel: String
+    @State private var hoveredBucketID: Date?
 
     private var maximum: Int {
         max(activity.buckets.map(\.opens).max() ?? 0, 1)
     }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 7) {
             GeometryReader { proxy in
-                HStack(alignment: .bottom, spacing: activity.buckets.count > 20 ? 3 : 6) {
-                    ForEach(activity.buckets) { bucket in
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(bucket.opens == 0 ? Color.secondary.opacity(0.14) : Color.accentColor)
-                            .frame(
-                                maxWidth: .infinity,
-                                minHeight: 3,
-                                maxHeight: barHeight(for: bucket.opens, availableHeight: proxy.size.height)
-                            )
+                let spacing: CGFloat = activity.buckets.count > 20 ? 3 : 6
+                ZStack(alignment: .topLeading) {
+                    HStack(alignment: .bottom, spacing: spacing) {
+                        ForEach(activity.buckets) { bucket in
+                            VStack(spacing: 0) {
+                                Spacer(minLength: 0)
+                                RoundedRectangle(cornerRadius: 2.5)
+                                    .fill(barColor(for: bucket))
+                                    .frame(
+                                        minHeight: 3,
+                                        maxHeight: barHeight(
+                                            for: bucket.opens,
+                                            availableHeight: proxy.size.height
+                                        )
+                                    )
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                            .help(tooltipText(for: bucket))
                             .accessibilityLabel(bucket.accessibilityLabel(locale: locale))
                             .accessibilityValue("\(bucket.opens)")
+                        }
+                    }
+
+                    if let hoveredBucket,
+                       let index = activity.buckets.firstIndex(where: { $0.id == hoveredBucket.id })
+                    {
+                        chartTooltip(for: hoveredBucket)
+                            .fixedSize()
+                            .position(
+                                x: tooltipX(
+                                    index: index,
+                                    width: proxy.size.width,
+                                    spacing: spacing
+                                ),
+                                y: 21
+                            )
+                            .allowsHitTesting(false)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onContinuousHover { phase in
+                    switch phase {
+                    case .active(let location):
+                        hoveredBucketID = bucketID(
+                            at: location.x,
+                            width: proxy.size.width,
+                            spacing: spacing
+                        )
+                    case .ended:
+                        hoveredBucketID = nil
                     }
                 }
             }
-            .frame(height: 100)
+            .frame(height: 118)
 
             HStack {
                 Text(activity.buckets.first?.shortLabel(locale: locale) ?? "")
@@ -264,6 +337,65 @@ private struct UsageActivityChart: View {
             .font(.caption2)
             .foregroundStyle(.tertiary)
         }
+    }
+
+    private var hoveredBucket: CueUsageActivity.Bucket? {
+        activity.buckets.first { $0.id == hoveredBucketID }
+    }
+
+    private func chartTooltip(for bucket: CueUsageActivity.Bucket) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(bucket.accessibilityLabel(locale: locale))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(valueLabel)
+                    .foregroundStyle(.secondary)
+                Text("\(bucket.opens)")
+                    .font(.callout.weight(.semibold))
+                    .monospacedDigit()
+            }
+        }
+        .font(.caption2)
+        .frame(maxWidth: 190, alignment: .leading)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
+        .overlay {
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.13), radius: 7, y: 3)
+    }
+
+    private func tooltipText(for bucket: CueUsageActivity.Bucket) -> String {
+        "\(bucket.accessibilityLabel(locale: locale))\n\(valueLabel): \(bucket.opens)"
+    }
+
+    private func barColor(for bucket: CueUsageActivity.Bucket) -> Color {
+        if hoveredBucketID == bucket.id {
+            return Color.accentColor.opacity(0.72)
+        }
+        return bucket.opens == 0 ? Color.secondary.opacity(0.13) : Color.accentColor
+    }
+
+    private func tooltipX(index: Int, width: CGFloat, spacing: CGFloat) -> CGFloat {
+        let count = max(activity.buckets.count, 1)
+        let totalSpacing = spacing * CGFloat(max(count - 1, 0))
+        let barWidth = max((width - totalSpacing) / CGFloat(count), 1)
+        let center = CGFloat(index) * (barWidth + spacing) + barWidth / 2
+        return min(max(center, 105), max(width - 105, 105))
+    }
+
+    private func bucketID(at x: CGFloat, width: CGFloat, spacing: CGFloat) -> Date? {
+        guard !activity.buckets.isEmpty else { return nil }
+        let count = activity.buckets.count
+        let totalSpacing = spacing * CGFloat(max(count - 1, 0))
+        let barWidth = max((width - totalSpacing) / CGFloat(count), 1)
+        let stride = barWidth + spacing
+        let index = min(max(Int(x / stride), 0), count - 1)
+        return activity.buckets[index].id
     }
 
     private func barHeight(for opens: Int, availableHeight: CGFloat) -> CGFloat {

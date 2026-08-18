@@ -72,7 +72,7 @@ cue --wait
 - `⌥⌘ ←` / `⌥⌘ →`：切换上一个/下一个并发会话（可在设置中修改）
 - 在“设置 → 编辑器 → 编辑器字体”中可使用 macOS 原生字体面板选择字体和字号；安装 Nerd Font 后可选择相应字体显示其私有区图标。
 - 在“设置 → 编辑器”中可开启“中英文之间自动加空格”；开启后仅在提交 prompt 时处理相邻的中文与英文/数字，不影响编辑过程或取消操作。
-- 在“设置 → AI”中可配置 DeepSeek AI 重写：API Key 保存在当前用户的 `~/Library/Application Support/Cue Notchpad/config.json`（权限 `0600`），也可用 `CUE_DEEPSEEK_API_KEY` 环境变量覆盖。Cue 只在用户按重写快捷键时发送当前 prompt，不提供 FIM 或行间补全。
+- 在“设置 → 供应商凭据”中可搜索并按折叠分类管理全部 Provider 的凭据（环境变量 / 本地保存 / 无需 Key），点选行即切换执行 AI 重写的 Provider。各 Provider 的凭据独立保存在 `~/Library/Application Support/Cue Notchpad/config.json`（权限 `0600`），也可由对应环境变量提供。Cue 只在用户按重写快捷键时发送当前 prompt，不提供 FIM 或行间补全。
 - 重写提示词支持 `${message}`：当当前 Cue 窗口由 Pi 打开时，可在提示词任意位置插入 active branch 上最近一个 assistant turn 的文本。
 - `⌘ ,`：打开设置窗口
 - 在“设置 → AI”中可显式安装 Cue 管理的全局 Pi integration。安装位置为 `~/.pi/agent/extensions/pi-cue-context/`（或 `PI_CODING_AGENT_DIR` 指定的 agent 目录）；Cue 不修改 Pi 的 `settings.json`。
@@ -83,7 +83,25 @@ cue --wait
 
 ## AI 重写与 Pi `${message}`
 
-Cue 的 AI 能力只保留用户显式触发的 Chat Completion 重写。当前编辑器文本作为 user message 发送，用户配置的重写提示词作为 system message 发送；请求可能产生 DeepSeek 账户费用。
+Cue 的 AI 能力只保留用户显式触发的文本重写。当前编辑器文本作为 user input 发送，用户配置的重写提示词作为 system instruction 发送；请求可能产生所选 Provider 的账户费用。
+
+Provider 与 API adapter 参考 Pi Coding Agent 的分层设计，但只内置官方条款未限定工具白名单、指定交互场景或专属客户端 OAuth 的接入方式：
+
+| 类别 | 内置 Provider |
+|---|---|
+| 官方 API | DeepSeek、OpenAI、Anthropic、Google Gemini、OpenRouter、Moonshot AI CN（Kimi）、Z.AI（智谱 GLM 国际版）、MiniMax、Xiaomi MiMo、Ant Ling、阿里云百炼（DashScope）、火山方舟 Ark、腾讯混元、百度千帆、SiliconFlow（硅基流动） |
+| Token Plan | MiniMax Token Plan CN、Xiaomi MiMo Token Plan CN |
+| 平台与网关 | OpenCode Zen、OpenCode Go、Azure OpenAI、Google Vertex AI、Amazon Bedrock、Together AI、Fireworks AI、Groq、Hugging Face、NVIDIA NIM、Vercel AI Gateway、Cloudflare AI Gateway、xAI API |
+| 本地 | Ollama、LM Studio、vLLM、llama.cpp、LocalAI、MLX、Jan、GPT4All、KoboldCpp、Msty |
+| 自定义 | OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 或 Google Generative AI；可配置 Base URL 与 Model ID |
+
+OpenCode、Fireworks、Cloudflare 与 xAI 可按 Provider 实际 endpoint 选择 API。Azure OpenAI 需填写以 `/openai/v1` 结尾的资源 Base URL；Vertex 需填写包含 project、location 与 `publishers/google` 的完整 Base URL；Cloudflare 需填写包含 account、gateway 与所选 API route 的 Base URL；Bedrock 当前支持官方 long-term API key/bearer token，不读取 AWS profile 或 ADC。模型目录是可编辑的初始列表，仍可直接输入任意有效 Model ID。
+
+本地 Provider 默认指向本机端口（Ollama 11434、LM Studio 1234、vLLM 8000、llama.cpp/LocalAI/MLX 8080、Jan 1337、GPT4All 4891、KoboldCpp 5001、Msty 3000），无需 API Key；地址可在设置中改为局域网内推理服务。模型列表在服务启动后可刷新。
+
+支持的环境变量：`CUE_DEEPSEEK_API_KEY` / `DEEPSEEK_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`GEMINI_API_KEY`、`OPENROUTER_API_KEY`、`MOONSHOT_API_KEY`、`ZAI_API_KEY`、`MINIMAX_API_KEY`、`XIAOMI_API_KEY`、`ANT_LING_API_KEY`、`DASHSCOPE_API_KEY`、`ARK_API_KEY`、`HUNYUAN_API_KEY`、`QIANFAN_API_KEY`、`SILICONFLOW_API_KEY`、`MINIMAX_CN_API_KEY`、`XIAOMI_TOKEN_PLAN_CN_API_KEY`、`OPENCODE_API_KEY`、`AZURE_OPENAI_API_KEY`、`GOOGLE_CLOUD_API_KEY`、`AWS_BEARER_TOKEN_BEDROCK`、`TOGETHER_API_KEY`、`FIREWORKS_API_KEY`、`GROQ_API_KEY`、`HF_TOKEN`、`NVIDIA_API_KEY`、`AI_GATEWAY_API_KEY`、`CLOUDFLARE_API_KEY`、`XAI_API_KEY`、`CUE_CUSTOM_API_KEY`。环境变量优先于本地配置文件。自定义本地服务（例如 Ollama、LM Studio、vLLM）可以不配置 API Key。
+
+Cue 刻意不内置 GLM Coding Plan、阿里云百炼 Coding Plan、腾讯 TokenHub、讯飞 Astron、Kimi Code subscription、百度/火山 Coding Plan，以及 GitHub Copilot、ChatGPT Codex、SuperGrok 等订阅登录：这些服务存在指定工具/场景范围、专属客户端 OAuth，或缺少足够明确的自定义客户端授权。普通开放 API 与受限订阅权益不能混用。
 
 Pi integration 安装后，请自行配置：
 
@@ -110,7 +128,7 @@ ${message}
 
 - 只选择最近 assistant turn 的 text block，不包含 thinking、tool call、tool result、图片或整段 session。
 - Pi message 不显示在编辑器、不写入 prompt 文件、UserDefaults、Usage archive 或日志。
-- 只有提示词包含 `${message}` 且用户明确触发重写时，Pi message 才会发送给 DeepSeek。
+- 只有提示词包含 `${message}` 且用户明确触发重写时，Pi message 才会发送给当前所选 Provider。
 - 普通 `cue --wait`、未安装 integration、bridge 超时或验证失败时，`${message}` 展开为空；普通编辑和不依赖该变量的重写继续可用。
 - 多个并发 Cue 会话分别持有启动时取得的 message snapshot，不会互相覆盖。
 

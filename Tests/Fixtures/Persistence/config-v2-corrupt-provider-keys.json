@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 2,
+  "deepSeekAPIKey": "legacy-copy",
+  "providerAPIKeys": ["not", "an", "object"],
+  "futureField": "must-remain-byte-identical"
+}

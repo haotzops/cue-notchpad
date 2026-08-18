@@ -4,170 +4,148 @@ import SwiftUI
 
 struct CueAISettingsView: View {
     @ObservedObject var settings: CueSettings
-    @Binding var deepSeekAPIKey: String
     @State private var isConfirmingPiUninstall = false
     @State private var copiedPiEditorInstruction = false
 
     var body: some View {
-        modelAPIConfiguration
-        promptRewrite
-        piIntegrationControls
-    }
-
-    private var modelAPIConfiguration: some View {
-        Section(settings.localized(.settingsModelAPIConfiguration)) {
-            SecureField(settings.localized(.settingsDeepSeekAPIKey), text: $deepSeekAPIKey)
-            HStack {
-                Button(settings.localized(.settingsSaveAPIKey)) {
-                    settings.saveDeepSeekAPIKey(deepSeekAPIKey)
-                    deepSeekAPIKey = ""
-                }
-                .disabled(deepSeekAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                Button(settings.localized(.settingsRefreshModels)) {
-                    settings.refreshDeepSeekModelsIfPossible()
-                }
-                .disabled(!settings.deepSeekKeyConfigured || settings.isLoadingDeepSeekModels)
-
-                Button(settings.localized(.settingsHealthCheck)) {
-                    settings.checkDeepSeekServiceHealth()
-                }
-                .disabled(!settings.deepSeekKeyConfigured || settings.isTestingDeepSeekConnection)
-
-                Button(settings.localized(.settingsRemoveAPIKey)) {
-                    settings.removeDeepSeekAPIKey()
-                }
-                .disabled(!settings.deepSeekKeyConfigured)
-            }
-
-            Text(settings.deepSeekKeyConfigured
-                ? settings.localized(.settingsAPIKeyConfigured)
-                : settings.localized(.settingsAPIKeyNotConfigured)
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-
-            if let status = settings.deepSeekStatus {
-                HStack(spacing: 6) {
-                    if settings.isTestingDeepSeekConnection {
-                        ProgressView().controlSize(.small)
-                    }
-                    Text(status.message)
-                }
-                .font(.footnote)
-                .foregroundStyle(status.style == .error ? Color.red : Color.secondary)
-            }
+        VStack(spacing: 18) {
+            rewritePrompt
+            piIntegrationControls
         }
     }
 
-    private var promptRewrite: some View {
-        Section(settings.localized(.settingsAIRewrite)) {
-            Picker(settings.localized(.settingsModel), selection: $settings.promptExpansionModel) {
-                Text(settings.localized(.settingsChooseModel)).tag(String?.none)
-                ForEach(settings.deepSeekModels, id: \.self) {
-                    Text($0).tag(Optional($0))
-                }
-            }
-            .disabled(!settings.deepSeekKeyConfigured)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(settings.localized(.settingsRewritePrompt))
+    private var rewritePrompt: some View {
+        CueSettingsCard(
+            settings.localized(.settingsRewritePrompt),
+            detail: settings.localized(.settingsRewritePromptHint)
+        ) {
+            VStack(alignment: .leading, spacing: 9) {
                 TextEditor(text: $settings.promptExpansionInstruction)
                     .font(.body)
-                    .frame(minHeight: 96)
-                Text(settings.localized(.settingsRewritePromptHint))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Text(settings.localized(.settingsRewriteMessageVariableHint))
-                    .font(.system(.footnote, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .frame(minHeight: 126)
+                    .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    }
+
+                Label(
+                    settings.localized(.settingsRewriteMessageVariableHint),
+                    systemImage: "curlybraces"
+                )
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
     private var piIntegrationControls: some View {
-        Section(settings.localized(.settingsPiIntegration)) {
-            LabeledContent(settings.localized(.settingsPiIntegration)) {
-                Text(piIntegrationStatusText)
-                    .font(.footnote)
-                    .foregroundStyle(piIntegrationStatusColor)
-            }
-
-            Text("\(settings.localized(.settingsPiIntegrationPath)) \(settings.piIntegrationDirectoryPath)")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            HStack {
-                switch settings.piIntegrationState {
-                case .notInstalled:
-                    Button(settings.localized(.settingsPiIntegrationInstall)) {
-                        settings.installPiIntegration()
-                    }
-                case .installed:
-                    Button(settings.localized(.settingsPiIntegrationUninstall), role: .destructive) {
-                        isConfirmingPiUninstall = true
-                    }
-                    .confirmationDialog(
-                        settings.localized(.settingsPiIntegrationUninstallConfirmation),
-                        isPresented: $isConfirmingPiUninstall,
-                        titleVisibility: .visible
-                    ) {
-                        Button(settings.localized(.settingsPiIntegrationUninstall), role: .destructive) {
-                            settings.uninstallPiIntegration()
-                        }
-                        Button(settings.localized(.settingsCancel), role: .cancel) {}
-                    }
-                case .needsRepair:
-                    Button(settings.localized(.settingsPiIntegrationRepair)) {
-                        settings.repairPiIntegration()
-                    }
-                case .foreign:
-                    EmptyView()
+        CueSettingsCard(
+            settings.localized(.settingsPiIntegration),
+            detail: settings.localized(.settingsPiIntegrationRewriteHint)
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    CueSettingsStatusBadge(
+                        text: piIntegrationStatusText,
+                        color: piIntegrationStatusColor,
+                        systemImage: piIntegrationStatusImage
+                    )
+                    Spacer()
+                    piIntegrationAction
                 }
-            }
 
-            if case .foreign = settings.piIntegrationState {
-                Text(settings.localized(.settingsPiIntegrationForeignHint))
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-            }
-
-            if let message = settings.piIntegrationErrorMessage {
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-            }
-
-            Text(settings.localized(.settingsPiIntegrationRewriteHint))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(settings.localized(.settingsPiIntegrationExternalEditorHint))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    Text(piExternalEditorInstruction)
-                        .font(.system(.footnote, design: .monospaced))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(settings.localized(.settingsPiIntegrationPath))
+                        .font(.caption.weight(.medium))
+                    Text(settings.piIntegrationDirectoryPath)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
                         .textSelection(.enabled)
-                    Button {
-                        let pasteboard = NSPasteboard.general
-                        pasteboard.clearContents()
-                        pasteboard.setString(piExternalEditorInstruction, forType: .string)
-                        copiedPiEditorInstruction = true
-                    } label: {
-                        Label(
-                            copiedPiEditorInstruction
-                                ? settings.localized(.settingsPiIntegrationCopied)
-                                : settings.localized(.settingsPiIntegrationCopy),
-                            systemImage: copiedPiEditorInstruction ? "checkmark" : "doc.on.doc"
-                        )
+                }
+
+                if case .foreign = settings.piIntegrationState {
+                    Label(
+                        settings.localized(.settingsPiIntegrationForeignHint),
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let message = settings.piIntegrationErrorMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(settings.localized(.settingsPiIntegrationExternalEditorHint))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Text(piExternalEditorInstruction)
+                            .font(.system(.callout, design: .monospaced))
+                            .textSelection(.enabled)
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 7))
+                        Button {
+                            let pasteboard = NSPasteboard.general
+                            pasteboard.clearContents()
+                            pasteboard.setString(piExternalEditorInstruction, forType: .string)
+                            copiedPiEditorInstruction = true
+                        } label: {
+                            Label(
+                                copiedPiEditorInstruction
+                                    ? settings.localized(.settingsPiIntegrationCopied)
+                                    : settings.localized(.settingsPiIntegrationCopy),
+                                systemImage: copiedPiEditorInstruction ? "checkmark" : "doc.on.doc"
+                            )
+                        }
                     }
-                    .buttonStyle(.borderless)
                 }
             }
         }
         .onAppear { settings.refreshPiIntegrationState() }
+    }
+
+    @ViewBuilder
+    private var piIntegrationAction: some View {
+        switch settings.piIntegrationState {
+        case .notInstalled:
+            Button(settings.localized(.settingsPiIntegrationInstall)) {
+                settings.installPiIntegration()
+            }
+            .buttonStyle(.borderedProminent)
+        case .installed:
+            Button(settings.localized(.settingsPiIntegrationUninstall), role: .destructive) {
+                isConfirmingPiUninstall = true
+            }
+            .confirmationDialog(
+                settings.localized(.settingsPiIntegrationUninstallConfirmation),
+                isPresented: $isConfirmingPiUninstall,
+                titleVisibility: .visible
+            ) {
+                Button(settings.localized(.settingsPiIntegrationUninstall), role: .destructive) {
+                    settings.uninstallPiIntegration()
+                }
+                Button(settings.localized(.settingsCancel), role: .cancel) {}
+            }
+        case .needsRepair:
+            Button(settings.localized(.settingsPiIntegrationRepair)) {
+                settings.repairPiIntegration()
+            }
+            .buttonStyle(.borderedProminent)
+        case .foreign:
+            EmptyView()
+        }
     }
 
     private var piExternalEditorInstruction: String {
@@ -192,6 +170,14 @@ struct CueAISettingsView: View {
         case .installed: .green
         case .needsRepair, .foreign: .red
         case .notInstalled: .secondary
+        }
+    }
+
+    private var piIntegrationStatusImage: String {
+        switch settings.piIntegrationState {
+        case .installed: "checkmark.circle.fill"
+        case .needsRepair, .foreign: "exclamationmark.triangle.fill"
+        case .notInstalled: "circle.dashed"
         }
     }
 }

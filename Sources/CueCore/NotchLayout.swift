@@ -56,7 +56,7 @@ public struct NotchScreenGeometry: Equatable, Sendable {
 }
 
 public enum NotchLayoutConstraints {
-    public static let defaultOpenWidth: CGFloat = 550
+    public static let defaultOpenWidth: CGFloat = 600
     public static let defaultOpenHeight: CGFloat = 150
     public static let minimumOpenWidth: CGFloat = 420
     public static let maximumOpenWidth: CGFloat = 1_200

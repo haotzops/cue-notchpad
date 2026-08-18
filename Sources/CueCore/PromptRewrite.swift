@@ -7,19 +7,3 @@ public enum PromptRewriteTemplate {
         template.replacingOccurrences(of: messageVariable, with: message ?? "")
     }
 }
-
-public struct DeepSeekModelList: Decodable, Sendable {
-    public struct Model: Decodable, Sendable {
-        public let id: String
-        public let object: String
-        public let ownedBy: String
-
-        enum CodingKeys: String, CodingKey {
-            case id, object
-            case ownedBy = "owned_by"
-        }
-    }
-
-    public let object: String
-    public let data: [Model]
-}

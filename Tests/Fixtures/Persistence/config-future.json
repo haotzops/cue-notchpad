@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 3,
+  "deepSeekAPIKey": "legacy-future-key",
+  "providerAPIKeys": {
+    "deepseek": "future-deepseek-key",
+    "anthropic": "future-anthropic-key",
+    "future-provider": "future-provider-key"
+  },
+  "futureField": {
+    "mustRemain": true
+  }
+}

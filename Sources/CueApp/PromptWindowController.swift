@@ -24,6 +24,8 @@ final class PromptWindowController: NSWindowController {
     private var settingsObservation: AnyCancellable?
     private var editorLayoutObservation: AnyCancellable?
     private var layoutUpdateWorkItem: DispatchWorkItem?
+    private weak var bottomResizeHandle: CueBottomResizeHandle?
+    private var resizeStartHeight: CGFloat = 0
     private var didFinish = false
 
     init(
@@ -65,7 +67,8 @@ final class PromptWindowController: NSWindowController {
         super.init(window: panel)
         configure(panel)
 
-        panel.contentView = NSHostingView(
+        let containerView = NSView(frame: NSRect(origin: .zero, size: contentSize))
+        let hostingView = NSHostingView(
             rootView: PromptView(
                 presentation: presentation,
                 settings: settings,
@@ -80,6 +83,24 @@ final class PromptWindowController: NSWindowController {
                 }
             )
         )
+        hostingView.frame = containerView.bounds
+        hostingView.autoresizingMask = [.width, .height]
+        containerView.addSubview(hostingView)
+
+        let bottomResizeHandle = CueBottomResizeHandle(
+            frame: NSRect(x: 0, y: 0, width: contentSize.width, height: 20)
+        )
+        bottomResizeHandle.autoresizingMask = [.width, .maxYMargin]
+        bottomResizeHandle.isHidden = true
+        bottomResizeHandle.onResizeBegan = { [weak self, weak panel] in
+            self?.resizeStartHeight = panel?.frame.height ?? 0
+        }
+        bottomResizeHandle.onResize = { [weak self] delta in
+            self?.resizePromptWindow(by: delta)
+        }
+        containerView.addSubview(bottomResizeHandle)
+        panel.contentView = containerView
+        self.bottomResizeHandle = bottomResizeHandle
 
         settingsObservation = settings.objectWillChange.sink { [weak self] in
             self?.scheduleLayoutUpdate()
@@ -263,7 +284,27 @@ final class PromptWindowController: NSWindowController {
         if abs(presentation.effectiveOpenHeight - openHeight) >= 0.5 {
             presentation.effectiveOpenHeight = openHeight
         }
+        updateBottomResizeHandleVisibility()
         panel.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
+    }
+
+    private func resizePromptWindow(by delta: CGFloat) {
+        guard !settings.locksPromptWindow else { return }
+        let maximumHeight = min(
+            CGFloat(CueSettings.maximumWindowHeight),
+            targetScreen.visibleFrame.height - 8
+        )
+        let requestedHeight = min(
+            max(resizeStartHeight + delta, CGFloat(CueSettings.minimumWindowHeight)),
+            maximumHeight
+        )
+        guard abs(CGFloat(settings.windowHeight) - requestedHeight) >= 0.5 else { return }
+        settings.windowHeight = Double(requestedHeight)
+        applySettings()
+    }
+
+    private func updateBottomResizeHandleVisibility() {
+        bottomResizeHandle?.isHidden = settings.locksPromptWindow || !presentation.isExpanded
     }
 
     private func configure(_ panel: NSPanel) {
@@ -312,6 +353,7 @@ final class PromptWindowController: NSWindowController {
         withAnimation(.spring(response: 0.40, dampingFraction: 0.84)) {
             presentation.isExpanded = expanded
         }
+        updateBottomResizeHandleVisibility()
     }
 
     private func focusEditor(after delay: TimeInterval) {
