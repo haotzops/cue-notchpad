@@ -17,6 +17,10 @@ bash -n Scripts/*.sh
 ruby -c "$RENDERED_CASK"
 grep -q 'version "0.0.0"' "$RENDERED_CASK"
 grep -q 'sha256 "0000000000000000000000000000000000000000000000000000000000000000"' "$RENDERED_CASK"
+grep -q 'postflight_steps do' "$RENDERED_CASK"
+! grep -q 'postflight do' "$RENDERED_CASK"
+grep -q 'if_path_exists "{{appdir}}/Cue Notchpad.app" do' "$RENDERED_CASK"
+grep -q 'run "/usr/bin/xattr"' "$RENDERED_CASK"
 
 python3 - <<'PY'
 import json

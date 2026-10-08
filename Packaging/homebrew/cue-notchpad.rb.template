@@ -14,11 +14,11 @@ cask "cue-notchpad" do
   command_wrapper "cue",
                    executable: "#{appdir}/Cue Notchpad.app/Contents/MacOS/cue"
 
-  postflight do
-    app_path = appdir/"Cue Notchpad.app"
-    next unless app_path.exist?
-
-    system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", app_path]
+  postflight_steps do
+    if_path_exists "{{appdir}}/Cue Notchpad.app" do
+      run "/usr/bin/xattr",
+          args: ["-dr", "com.apple.quarantine", "{{appdir}}/Cue Notchpad.app"]
+    end
   end
 
   caveats <<~EOS
