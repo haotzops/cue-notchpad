@@ -7,6 +7,12 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 
 ## [未发布]
 
+## [0.4.1] - 2026-10-08
+
+### 修复
+
+- Homebrew Cask 改用 `postflight_steps`，消除已弃用的 `postflight` 警告，同时保留安装后移除应用 quarantine 属性的行为。
+
 ## [0.4.0] - 2026-08-19
 
 ### 新增
@@ -97,6 +103,7 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 - 使用本地 `cl100k_base` 词表计算 token，不发送网络请求。
 - 添加 Cue Notchpad 应用图标。
 
+[0.4.1]: https://github.com/haotzops/cue-notchpad/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/haotzops/cue-notchpad/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/haotzops/cue-notchpad/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/haotzops/cue-notchpad/compare/v0.2.0...v0.3.0
