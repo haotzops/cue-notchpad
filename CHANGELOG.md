@@ -7,6 +7,17 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 
 ## [未发布]
 
+### 新增
+
+- 新增多 Provider 配置 profile、自定义 API 配置、模型 endpoint 管理和可配置的余额检测。
+- 重新设计设置窗口，统一使用系统导航、表单和原生控件，并补充 provider 诊断状态。
+
+### 变更
+
+- 内置 AI provider 收敛为 DeepSeek、OpenAI 和 Anthropic；其他服务通过自定义 API profile 接入。
+- API Key 改为按 profile 保存在本地配置文件，不再从环境变量读取供应商凭据。
+- 构建脚本补充 SDK metadata 校验和 SwiftPM 资源 bundle 兼容处理。
+
 ## [0.4.1] - 2026-10-08
 
 ### 修复

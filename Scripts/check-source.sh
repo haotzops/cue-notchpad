@@ -35,9 +35,12 @@ for name, version in (("config-v1.json", 1), ("config-v2.json", 2), ("usage-v1.j
 
 future_usage = json.loads((fixtures / "usage-future.json").read_text())
 future_config = json.loads((fixtures / "config-future.json").read_text())
+provider_profiles = json.loads((fixtures / "provider-profiles-v1.json").read_text())
 corrupt_v2 = json.loads((fixtures / "config-v2-corrupt-provider-keys.json").read_text())
 assert future_usage["schemaVersion"] > 1
 assert future_config["schemaVersion"] > 2
+assert provider_profiles["schemaVersion"] == 1
+assert provider_profiles["activeProfileID"] in {profile["id"] for profile in provider_profiles["profiles"]}
 assert corrupt_v2["schemaVersion"] == 2
 assert not isinstance(corrupt_v2["providerAPIKeys"], dict)
 

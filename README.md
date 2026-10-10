@@ -85,23 +85,11 @@ cue --wait
 
 Cue 的 AI 能力只保留用户显式触发的文本重写。当前编辑器文本作为 user input 发送，用户配置的重写提示词作为 system instruction 发送；请求可能产生所选 Provider 的账户费用。
 
-Provider 与 API adapter 参考 Pi Coding Agent 的分层设计，但只内置官方条款未限定工具白名单、指定交互场景或专属客户端 OAuth 的接入方式：
+Cue 只保留三个内置配置：DeepSeek、OpenAI 和 Anthropic。其他云服务、网关和本地推理服务统一通过“自定义 API”配置接入；自定义配置支持 OpenAI Chat Completions、OpenAI Responses 和 Anthropic Messages 三种协议，可以创建多个配置。
 
-| 类别 | 内置 Provider |
-|---|---|
-| 官方 API | DeepSeek、OpenAI、Anthropic、Google Gemini、OpenRouter、Moonshot AI CN（Kimi）、Z.AI（智谱 GLM 国际版）、MiniMax、Xiaomi MiMo、Ant Ling、阿里云百炼（DashScope）、火山方舟 Ark、腾讯混元、百度千帆、SiliconFlow（硅基流动） |
-| Token Plan | MiniMax Token Plan CN、Xiaomi MiMo Token Plan CN |
-| 平台与网关 | OpenCode Zen、OpenCode Go、Azure OpenAI、Google Vertex AI、Amazon Bedrock、Together AI、Fireworks AI、Groq、Hugging Face、NVIDIA NIM、Vercel AI Gateway、Cloudflare AI Gateway、xAI API |
-| 本地 | Ollama、LM Studio、vLLM、llama.cpp、LocalAI、MLX、Jan、GPT4All、KoboldCpp、Msty |
-| 自定义 | OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 或 Google Generative AI；可配置 Base URL 与 Model ID |
+自定义配置包含名称、协议、Base URL、API Key 和 Model ID。Cue 会按协议与规范化 Base URL 匹配内置 endpoint catalog；匹配成功时自动提供模型查询和可用的余额检测接口。未匹配的服务需要手动填写模型接口地址、余额接口地址以及余额 JSON Pointer。Ollama、LM Studio、vLLM 等本地服务通常选择 OpenAI Chat Completions。
 
-OpenCode、Fireworks、Cloudflare 与 xAI 可按 Provider 实际 endpoint 选择 API。Azure OpenAI 需填写以 `/openai/v1` 结尾的资源 Base URL；Vertex 需填写包含 project、location 与 `publishers/google` 的完整 Base URL；Cloudflare 需填写包含 account、gateway 与所选 API route 的 Base URL；Bedrock 当前支持官方 long-term API key/bearer token，不读取 AWS profile 或 ADC。模型目录是可编辑的初始列表，仍可直接输入任意有效 Model ID。
-
-本地 Provider 默认指向本机端口（Ollama 11434、LM Studio 1234、vLLM 8000、llama.cpp/LocalAI/MLX 8080、Jan 1337、GPT4All 4891、KoboldCpp 5001、Msty 3000），无需 API Key；地址可在设置中改为局域网内推理服务。模型列表在服务启动后可刷新。
-
-支持的环境变量：`CUE_DEEPSEEK_API_KEY` / `DEEPSEEK_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`GEMINI_API_KEY`、`OPENROUTER_API_KEY`、`MOONSHOT_API_KEY`、`ZAI_API_KEY`、`MINIMAX_API_KEY`、`XIAOMI_API_KEY`、`ANT_LING_API_KEY`、`DASHSCOPE_API_KEY`、`ARK_API_KEY`、`HUNYUAN_API_KEY`、`QIANFAN_API_KEY`、`SILICONFLOW_API_KEY`、`MINIMAX_CN_API_KEY`、`XIAOMI_TOKEN_PLAN_CN_API_KEY`、`OPENCODE_API_KEY`、`AZURE_OPENAI_API_KEY`、`GOOGLE_CLOUD_API_KEY`、`AWS_BEARER_TOKEN_BEDROCK`、`TOGETHER_API_KEY`、`FIREWORKS_API_KEY`、`GROQ_API_KEY`、`HF_TOKEN`、`NVIDIA_API_KEY`、`AI_GATEWAY_API_KEY`、`CLOUDFLARE_API_KEY`、`XAI_API_KEY`、`CUE_CUSTOM_API_KEY`。环境变量优先于本地配置文件。自定义本地服务（例如 Ollama、LM Studio、vLLM）可以不配置 API Key。
-
-Cue 刻意不内置 GLM Coding Plan、阿里云百炼 Coding Plan、腾讯 TokenHub、讯飞 Astron、Kimi Code subscription、百度/火山 Coding Plan，以及 GitHub Copilot、ChatGPT Codex、SuperGrok 等订阅登录：这些服务存在指定工具/场景范围、专属客户端 OAuth，或缺少足够明确的自定义客户端授权。普通开放 API 与受限订阅权益不能混用。
+内置和自定义配置的 API Key 按 profile 独立保存在 `~/Library/Application Support/Cue Notchpad/config.json`。Cue 不从环境变量读取供应商 API Key；未保存本地凭据的内置配置需要在设置中手动填写。
 
 Pi integration 安装后，请自行配置：
 
@@ -135,10 +123,28 @@ ${message}
 
 ## 从源码构建
 
-要求 macOS 13+、Swift 6、Node.js 22+ 和 Xcode Command Line Tools。首次使用可先安装命令行工具：
+要求 macOS 13+、Swift 6、Node.js 22+ 和完整的 Xcode 工具链。仅安装 Xcode Command Line Tools 不足以构建当前版本：SwiftUI 的 `@State` 在较新的 macOS SDK 中依赖 Xcode 提供的 `SwiftUIMacros` 编译器插件。
+
+安装 Xcode 后，选择其 Developer 目录并完成首次初始化（如果 Xcode 安装在其他位置，请相应调整路径）：
 
 ```bash
-xcode-select --install
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -license accept
+sudo xcodebuild -runFirstLaunch
+```
+
+验证当前 shell 使用的是完整 Xcode 工具链：
+
+```bash
+xcode-select -p
+xcodebuild -version
+xcrun --find swift
+```
+
+输出中的开发者目录应与实际安装的 Xcode Developer 目录一致（上例为 `/Applications/Xcode.app/Contents/Developer`），并且 `xcodebuild` 应能正常显示 Xcode 版本。如果不希望全局切换开发者目录，也可以在构建时设置 `DEVELOPER_DIR`，例如：
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer make check
 ```
 
 获取源码并构建：
@@ -151,7 +157,12 @@ make app
 open "build/Cue Notchpad.app"
 ```
 
-`make check` 是本地开发的统一质量门禁：校验脚本与源码 metadata、构建 debug products，并运行全部测试。需要更细粒度操作时，可单独使用 `make build`、`make test`、`make app` 或 `make install`；这些入口始终生成 debug 开发构建。
+`make check` 是本地开发的统一质量门禁：校验脚本与源码 metadata、构建 debug products，并运行全部测试。需要更细粒度操作时，可单独使用 `make build`、`make test`、`make app` 或 `make install`；这些入口始终生成 debug 开发构建。如果出现 `external macro implementation type 'SwiftUIMacros.StateMacro' could not be found` 或 `plugin for module 'SwiftUIMacros' not found`，请先检查 `xcode-select -p` 是否指向完整 Xcode，并清理旧工具链产生的缓存后重试：
+
+```bash
+rm -rf .build build
+make check
+```
 
 `make release-preflight` 是本地、CI 与 tag workflow 共用的发布前门禁：先执行 `make check`，然后只构建一次本地 Release 候选 ZIP，并验证 checksum、provenance、app metadata、签名、架构、资源和 CLI smoke test。该命令不会上传或发布任何内容；正式 Release 只能由 `v*.*.*` tag workflow 发布。运行 `make help` 可查看完整命令分组。
 

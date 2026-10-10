@@ -4,9 +4,13 @@ import CoreGraphics
 import CueCore
 import Darwin
 import Foundation
+import SwiftUI
 
 private struct StubAIProviderService: AIProviderService {
     func availableModels(provider: CueAIProvider, apiKey: String?) async throws -> [String] { [] }
+    func balance(provider: CueAIProvider, apiKey: String?) async throws -> CueProviderBalance {
+        CueProviderBalance(amount: 0, currency: nil)
+    }
     func validate(provider: CueAIProvider, apiKey: String?, model: String) async throws {}
     func rewritePrompt(
         _ text: String,
@@ -319,49 +323,6 @@ expect(
 expect(CueAIProvider.builtIn(.deepSeek)?.api == .openAICompletions, "DeepSeek uses OpenAI completions")
 expect(CueAIProvider.builtIn(.openAI)?.api == .openAIResponses, "OpenAI uses Responses like Pi")
 expect(CueAIProvider.builtIn(.anthropic)?.api == .anthropicMessages, "Anthropic uses Messages")
-expect(CueAIProvider.builtIn(.google)?.api == .googleGenerativeAI, "Google uses Generative AI")
-expect(CueAIProvider.builtIn(.miniMaxTokenPlanCN)?.api == .anthropicMessages, "MiniMax Token Plan uses Messages")
-expect(CueAIProvider.builtIn(.xiaomiTokenPlanCN)?.api == .openAICompletions, "MiMo Token Plan uses completions")
-expect(CueAIProvider.builtIn(.moonshotAICN)?.api == .openAICompletions, "Moonshot AI CN uses completions")
-expect(CueAIProvider.builtIn(.zAI)?.api == .openAICompletions, "Z.AI uses completions")
-expect(CueAIProvider.builtIn(.miniMax)?.api == .anthropicMessages, "MiniMax intl uses Messages")
-expect(CueAIProvider.builtIn(.xiaomi)?.api == .openAICompletions, "Xiaomi MiMo uses completions")
-expect(CueAIProvider.builtIn(.antLing)?.api == .openAICompletions, "Ant Ling uses completions")
-expect(CueAIProvider.builtIn(.aliyunBailian)?.api == .openAICompletions, "Aliyun Bailian uses completions")
-expect(CueAIProvider.builtIn(.volcengineArk)?.api == .openAICompletions, "Volcengine Ark uses completions")
-expect(CueAIProvider.builtIn(.tencentHunyuan)?.api == .openAICompletions, "Tencent Hunyuan uses completions")
-expect(CueAIProvider.builtIn(.baiduQianfan)?.api == .openAICompletions, "Baidu Qianfan uses completions")
-expect(CueAIProvider.builtIn(.siliconFlow)?.api == .openAICompletions, "SiliconFlow uses completions")
-expect(
-    CueAIProvider.builtIn(.aliyunBailian)?.baseURL.absoluteString
-        == "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    "Aliyun Bailian uses the OpenAI-compatible DashScope endpoint"
-)
-expect(
-    CueAIProvider.builtIn(.siliconFlow)?.baseURL.absoluteString == "https://api.siliconflow.cn/v1",
-    "SiliconFlow uses its v1 endpoint"
-)
-expect(
-    CueAIProvider.builtIn(.tencentHunyuan)?.baseURL.absoluteString
-        == "https://api.hunyuan.cloud.tencent.com/v1",
-    "Tencent Hunyuan uses its OpenAI-compatible endpoint"
-)
-let domesticAPIs = [
-    "moonshotai-cn", "zai", "minimax", "xiaomi", "ant-ling",
-    "dashscope", "ark", "hunyuan", "qianfan", "siliconflow",
-]
-expect(
-    domesticAPIs.allSatisfy { CueAIProviderID(rawValue: $0) != nil },
-    "domestic pay-as-you-go API providers are built in"
-)
-expect(CueAIProvider.builtIn(.azureOpenAI) == nil, "Azure requires an explicit resource endpoint")
-expect(CueAIProvider.builtIn(.googleVertex) == nil, "Vertex requires an explicit project endpoint")
-expect(CueAIProvider.builtIn(.amazonBedrock)?.api == .bedrockConverse, "Bedrock uses Converse")
-expect(
-    CueAIProvider.builtIn(.openCode, api: .anthropicMessages)?.baseURL.absoluteString
-        == "https://opencode.ai/zen",
-    "multi-API providers select the protocol-specific endpoint"
-)
 expect(
     CueAIProvider.custom(
         baseURL: URL(string: "http://localhost:11434/v1")!,
@@ -382,48 +343,30 @@ expect(
     CueAIProviderCatalog.providers.allSatisfy { !$0.endpoints.isEmpty },
     "every provider declares endpoints"
 )
-expect(
-    CueAIProviderCatalog.providers.allSatisfy {
-        ($0.authentication == .none) == $0.environmentKeys.isEmpty
-    },
-    "credential-less providers declare no environment keys"
-)
-expect(CueAIProvider.builtIn(.ollama)?.api == .openAICompletions, "Ollama uses OpenAI-compatible completions")
-expect(CueAIProvider.builtIn(.lmStudio)?.api == .openAICompletions, "LM Studio uses OpenAI-compatible completions")
-expect(CueAIProvider.builtIn(.vllm)?.api == .openAICompletions, "vLLM uses OpenAI-compatible completions")
-expect(CueAIProvider.builtIn(.llamaCpp)?.api == .openAICompletions, "llama.cpp uses OpenAI-compatible completions")
-expect(CueAIProvider.builtIn(.localAI)?.api == .openAICompletions, "LocalAI uses OpenAI-compatible completions")
-expect(CueAIProvider.builtIn(.mlx)?.api == .openAICompletions, "MLX uses OpenAI-compatible completions")
-expect(CueAIProvider.builtIn(.jan)?.api == .openAICompletions, "Jan uses OpenAI-compatible completions")
-expect(CueAIProvider.builtIn(.gpt4All)?.api == .openAICompletions, "GPT4All uses OpenAI-compatible completions")
-expect(CueAIProvider.builtIn(.koboldCpp)?.api == .openAICompletions, "KoboldCpp uses OpenAI-compatible completions")
-expect(CueAIProvider.builtIn(.msty)?.api == .openAICompletions, "Msty uses OpenAI-compatible completions")
-expect(
-    CueAIProvider.builtIn(.ollama)?.baseURL.absoluteString == "http://localhost:11434/v1",
-    "Ollama defaults to localhost:11434"
-)
-expect(
-    CueAIProvider.builtIn(.lmStudio)?.baseURL.absoluteString == "http://localhost:1234/v1",
-    "LM Studio defaults to localhost:1234"
-)
-expect(
-    CueAIProvider.builtIn(.jan)?.baseURL.absoluteString == "http://localhost:1337/v1",
-    "Jan defaults to localhost:1337"
-)
-expect(
-    CueAIProviderID.ollama.requiresAPIKey == false && CueAIProviderID.msty.requiresAPIKey == false,
-    "local providers do not require credentials"
-)
 expect(CueAIProviderID.deepSeek.requiresAPIKey, "cloud providers require credentials")
 expect(CueAIProviderID.custom.requiresAPIKey == false, "custom providers may run keyless")
-let restrictedProviderIDs = [
-    "zai-coding-cn", "qwen-token-plan-cn", "tencent-tokenhub", "astron-coding",
-    "baidu-coding-plan", "volcengine-coding-plan", "kimi-coding", "github-copilot", "openai-codex",
-]
+
+let pointStack = PointFieldStack()
+pointStack.numberField.stringValue = "600"
+pointStack.unitLabel.stringValue = "pt"
+pointStack.spacing = 4
+pointStack.layoutSubtreeIfNeeded()
 expect(
-    restrictedProviderIDs.allSatisfy { CueAIProviderID(rawValue: $0) == nil },
-    "restricted plans and subscription OAuth providers are not built into Cue"
+    pointStack.numberField.baselineOffsetFromBottom == pointStack.unitLabel.baselineOffsetFromBottom,
+    "native number and unit controls share a text baseline"
 )
+expect(pointStack.fittingSize.height == pointStack.numberField.fittingSize.height, "unit does not increase row height")
+var editedPointSize = 16.0
+let pointCoordinator = CuePointField.Coordinator(value: Binding(
+    get: { editedPointSize },
+    set: { editedPointSize = $0 }
+))
+pointStack.numberField.stringValue = "24"
+pointCoordinator.controlTextDidEndEditing(Notification(name: NSControl.textDidEndEditingNotification, object: pointStack.numberField))
+expect(editedPointSize == 24, "point field commits a valid number")
+pointStack.numberField.stringValue = "invalid"
+pointCoordinator.controlTextDidEndEditing(Notification(name: NSControl.textDidEndEditingNotification, object: pointStack.numberField))
+expect(editedPointSize == 24 && pointStack.numberField.stringValue == "24", "invalid input keeps the last value")
 
 let piContext = PiRewriteContext(
     version: PiSessionBridge.protocolVersion,
@@ -661,9 +604,9 @@ private func runAppTests() async {
         )
         expect(openAIResult == "openai rewrite", "OpenAI Responses text is decoded")
 
-        let openRouter = CueAIProvider.builtIn(.openRouter)!
+        let deepSeek = CueAIProvider.builtIn(.deepSeek)!
         let completionService = makeMockProviderService { request in
-            expect(request.url?.absoluteString == "https://openrouter.ai/api/v1/chat/completions", "OpenAI-compatible endpoint")
+            expect(request.url?.absoluteString == "https://api.deepseek.com/chat/completions", "DeepSeek uses completions endpoint")
             let body = try JSONSerialization.jsonObject(with: requestBody(request)) as? [String: Any]
             let messages = body?["messages"] as? [[String: Any]]
             expect(messages?.map { $0["role"] as? String } == ["system", "user"], "Chat Completions sends system and user roles")
@@ -673,9 +616,9 @@ private func runAppTests() async {
             )
         }
         let completionResult = try await completionService.rewritePrompt(
-            "draft", instruction: "system", provider: openRouter, model: "router/model", apiKey: "router-key"
+            "draft", instruction: "system", provider: deepSeek, model: "deepseek-v3", apiKey: "deepseek-key"
         )
-        expect(completionResult == "chat rewrite", "OpenAI-compatible text is decoded")
+        expect(completionResult == "chat rewrite", "DeepSeek completions text is decoded")
 
         let anthropic = CueAIProvider.builtIn(.anthropic)!
         let anthropicService = makeMockProviderService { request in
@@ -694,38 +637,11 @@ private func runAppTests() async {
         )
         expect(anthropicResult == "anthropic rewrite", "Anthropic text blocks are decoded")
 
-        let google = CueAIProvider.builtIn(.google)!
-        let googleService = makeMockProviderService { request in
-            expect(
-                request.url?.absoluteString == "https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent",
-                "Google uses generateContent endpoint"
-            )
-            expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gemini-key", "Google uses x-goog-api-key")
-            let body = try JSONSerialization.jsonObject(with: requestBody(request)) as? [String: Any]
-            expect(body?["systemInstruction"] != nil, "Google sends systemInstruction")
-            return successfulResponse(
-                for: request,
-                json: #"{"candidates":[{"content":{"parts":[{"text":"google rewrite"}]}}]}"#
-            )
-        }
-        let googleResult = try await googleService.rewritePrompt(
-            "draft", instruction: "system", provider: google, model: "gemini-test", apiKey: "gemini-key"
-        )
-        expect(googleResult == "google rewrite", "Google candidate text is decoded")
-
         let modelService = makeMockProviderService { request in
-            if request.url?.host == "generativelanguage.googleapis.com" {
-                return successfulResponse(
-                    for: request,
-                    json: #"{"models":[{"name":"models/gemini-a","supportedGenerationMethods":["generateContent"]},{"name":"models/embed","supportedGenerationMethods":["embedContent"]}]}"#
-                )
-            }
             return successfulResponse(for: request, json: #"{"data":[{"id":"model-b"},{"id":"model-a"}]}"#)
         }
-        let googleModels = try await modelService.availableModels(provider: google, apiKey: "gemini-key")
-        let openRouterModels = try await modelService.availableModels(provider: openRouter, apiKey: "router-key")
-        expect(googleModels == ["gemini-a"], "Google model discovery filters generateContent models")
-        expect(openRouterModels == ["model-a", "model-b"], "OpenAI model discovery sorts model identifiers")
+        let deepSeekModels = try await modelService.availableModels(provider: deepSeek, apiKey: "deepseek-key")
+        expect(deepSeekModels == ["model-a", "model-b"], "model discovery sorts model identifiers")
 
         let anthropicModelsService = makeMockProviderService { request in
             expect(request.url?.absoluteString == "https://api.anthropic.com/v1/models", "Anthropic model discovery uses v1")
@@ -737,198 +653,6 @@ private func runAppTests() async {
             apiKey: "anthropic-key"
         )
         expect(anthropicModels == ["claude-test"], "Anthropic model discovery decodes identifiers")
-
-        let miniMax = CueAIProvider.builtIn(.miniMax)!
-        let miniMaxService = makeMockProviderService { request in
-            expect(
-                request.url?.absoluteString == "https://api.minimax.io/anthropic/v1/messages",
-                "MiniMax intl uses the Messages endpoint on its Anthropic-compatible base"
-            )
-            expect(
-                request.value(forHTTPHeaderField: "x-api-key") == "minimax-key",
-                "MiniMax intl uses Anthropic vendor authentication"
-            )
-            expect(
-                request.value(forHTTPHeaderField: "anthropic-version") == "2023-06-01",
-                "MiniMax intl keeps the Anthropic protocol version header"
-            )
-            return successfulResponse(
-                for: request,
-                json: #"{"content":[{"type":"text","text":"minimax rewrite"}]}"#
-            )
-        }
-        let miniMaxResult = try await miniMaxService.rewritePrompt(
-            "draft", instruction: "system", provider: miniMax,
-            model: "MiniMax-M3", apiKey: "minimax-key"
-        )
-        expect(miniMaxResult == "minimax rewrite", "MiniMax intl Anthropic text is decoded")
-
-        let siliconFlow = CueAIProvider.builtIn(.siliconFlow)!
-        let siliconFlowService = makeMockProviderService { request in
-            expect(
-                request.url?.absoluteString == "https://api.siliconflow.cn/v1/chat/completions",
-                "SiliconFlow uses the OpenAI-compatible Chat Completions endpoint"
-            )
-            expect(
-                request.value(forHTTPHeaderField: "Authorization") == "Bearer siliconflow-key",
-                "SiliconFlow uses bearer auth"
-            )
-            return successfulResponse(
-                for: request,
-                json: #"{"choices":[{"message":{"content":"siliconflow rewrite"}}]}"#
-            )
-        }
-        let siliconFlowResult = try await siliconFlowService.rewritePrompt(
-            "draft", instruction: "system", provider: siliconFlow,
-            model: "deepseek-ai/DeepSeek-V3", apiKey: "siliconflow-key"
-        )
-        expect(siliconFlowResult == "siliconflow rewrite", "SiliconFlow text is decoded")
-
-        let ollama = CueAIProvider.builtIn(.ollama)!
-        let ollamaService = makeMockProviderService { request in
-            expect(
-                request.url?.absoluteString == "http://localhost:11434/v1/chat/completions",
-                "Ollama uses the OpenAI-compatible Chat Completions endpoint"
-            )
-            expect(
-                request.value(forHTTPHeaderField: "Authorization") == nil,
-                "local providers send no auth header without a key"
-            )
-            return successfulResponse(
-                for: request,
-                json: #"{"choices":[{"message":{"content":"local rewrite"}}]}"#
-            )
-        }
-        let ollamaResult = try await ollamaService.rewritePrompt(
-            "draft", instruction: "system", provider: ollama,
-            model: "qwen3", apiKey: nil
-        )
-        expect(ollamaResult == "local rewrite", "local rewrite works without credentials")
-
-        let ollamaDiscovery = makeMockProviderService { request in
-            expect(
-                request.url?.absoluteString == "http://localhost:11434/v1/models",
-                "local model discovery uses the OpenAI-compatible models endpoint"
-            )
-            return successfulResponse(
-                for: request,
-                json: #"{"data":[{"id":"qwen3"},{"id":"llama3.3"}]}"#
-            )
-        }
-        let ollamaModels = try await ollamaDiscovery.availableModels(provider: ollama, apiKey: nil)
-        expect(ollamaModels == ["llama3.3", "qwen3"], "local model discovery works without credentials")
-
-        let openCodeAnthropic = CueAIProvider.builtIn(.openCode, api: .anthropicMessages)!
-        let openCodeService = makeMockProviderService { request in
-            expect(
-                request.value(forHTTPHeaderField: "Authorization") == "Bearer opencode-key",
-                "OpenCode Anthropic-compatible API uses bearer auth"
-            )
-            expect(
-                request.value(forHTTPHeaderField: "x-api-key") == nil,
-                "OpenCode does not use Anthropic vendor authentication"
-            )
-            expect(
-                request.value(forHTTPHeaderField: "anthropic-version") == "2023-06-01",
-                "Anthropic-compatible bearer endpoints retain the protocol version header"
-            )
-            return successfulResponse(
-                for: request,
-                json: #"{"content":[{"type":"text","text":"opencode rewrite"}]}"#
-            )
-        }
-        let openCodeResult = try await openCodeService.rewritePrompt(
-            "draft", instruction: "system", provider: openCodeAnthropic,
-            model: "claude-test", apiKey: "opencode-key"
-        )
-        expect(openCodeResult == "opencode rewrite", "OpenCode Anthropic response is decoded")
-
-        let azure = CueAIProvider.builtIn(
-            .azureOpenAI,
-            baseURLOverride: URL(string: "https://example.openai.azure.com/openai/v1")!
-        )!
-        let azureService = makeMockProviderService { request in
-            expect(
-                request.url?.absoluteString == "https://example.openai.azure.com/openai/v1/responses",
-                "Azure uses the v1 Responses endpoint"
-            )
-            expect(request.value(forHTTPHeaderField: "api-key") == "azure-key", "Azure uses api-key auth")
-            return successfulResponse(
-                for: request,
-                json: #"{"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"azure rewrite"}]}]}"#
-            )
-        }
-        let azureResult = try await azureService.rewritePrompt(
-            "draft", instruction: "system", provider: azure, model: "deployment-name", apiKey: "azure-key"
-        )
-        expect(azureResult == "azure rewrite", "Azure Responses text is decoded")
-
-        let vertex = CueAIProvider.builtIn(
-            .googleVertex,
-            baseURLOverride: URL(string: "https://us-central1-aiplatform.googleapis.com/v1/projects/demo/locations/us-central1/publishers/google")!
-        )!
-        let vertexService = makeMockProviderService { request in
-            expect(
-                request.url?.absoluteString
-                    == "https://us-central1-aiplatform.googleapis.com/v1/projects/demo/locations/us-central1/publishers/google/models/gemini-test:generateContent",
-                "Vertex uses the complete publisher model endpoint"
-            )
-            expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "vertex-key", "Vertex uses Google API key auth")
-            return successfulResponse(
-                for: request,
-                json: #"{"candidates":[{"content":{"parts":[{"text":"vertex rewrite"}]}}]}"#
-            )
-        }
-        let vertexResult = try await vertexService.rewritePrompt(
-            "draft", instruction: "system", provider: vertex, model: "gemini-test", apiKey: "vertex-key"
-        )
-        expect(vertexResult == "vertex rewrite", "Vertex candidate text is decoded")
-
-        let bedrock = CueAIProvider.builtIn(.amazonBedrock)!
-        let bedrockService = makeMockProviderService { request in
-            expect(
-                request.url?.absoluteString
-                    == "https://bedrock-runtime.us-east-1.amazonaws.com/model/amazon.nova-2-lite-v1:0/converse",
-                "Bedrock uses the Converse endpoint"
-            )
-            expect(
-                request.value(forHTTPHeaderField: "Authorization") == "Bearer bedrock-token",
-                "Bedrock API key uses bearer auth"
-            )
-            return successfulResponse(
-                for: request,
-                json: #"{"output":{"message":{"content":[{"text":"bedrock rewrite"}]}}}"#
-            )
-        }
-        let bedrockResult = try await bedrockService.rewritePrompt(
-            "draft", instruction: "system", provider: bedrock,
-            model: "amazon.nova-2-lite-v1:0", apiKey: "bedrock-token"
-        )
-        expect(bedrockResult == "bedrock rewrite", "Bedrock Converse text is decoded")
-
-        let cloudflare = CueAIProvider.builtIn(
-            .cloudflareAIGateway,
-            api: .openAIResponses,
-            baseURLOverride: URL(string: "https://gateway.ai.cloudflare.com/v1/account/gateway/openai")!
-        )!
-        let cloudflareService = makeMockProviderService { request in
-            expect(
-                request.value(forHTTPHeaderField: "cf-aig-authorization") == "Bearer cloudflare-key",
-                "Cloudflare uses gateway authentication"
-            )
-            expect(
-                request.value(forHTTPHeaderField: "Authorization") == nil,
-                "Cloudflare does not forward its gateway key as upstream auth"
-            )
-            return successfulResponse(
-                for: request,
-                json: #"{"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"gateway rewrite"}]}]}"#
-            )
-        }
-        let cloudflareResult = try await cloudflareService.rewritePrompt(
-            "draft", instruction: "system", provider: cloudflare, model: "gpt-test", apiKey: "cloudflare-key"
-        )
-        expect(cloudflareResult == "gateway rewrite", "Cloudflare gateway response is decoded")
     } catch {
         expect(false, "provider adapter tests should not throw: \(error)")
     }
@@ -940,11 +664,7 @@ private func runAppTests() async {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         CueAPIKeyStore.configurationURLOverride = url
-        CueAPIKeyStore.environmentOverride = [:]
-        defer {
-            CueAPIKeyStore.configurationURLOverride = nil
-            CueAPIKeyStore.environmentOverride = nil
-        }
+        defer { CueAPIKeyStore.configurationURLOverride = nil }
 
         let versionOneData = try fixtureData(named: "config-v1.json")
         try versionOneData.write(to: url)
@@ -971,23 +691,14 @@ private func runAppTests() async {
         try fixtureData(named: "config-v2.json").write(to: url)
         let versionTwoOpenAIKey = try CueAPIKeyStore.loadAPIKey(for: .openAI)
         let versionTwoDeepSeekKey = try CueAPIKeyStore.loadAPIKey(for: .deepSeek)
-        let versionTwoMiniMaxKey = try CueAPIKeyStore.loadAPIKey(for: .miniMaxTokenPlanCN)
-        let versionTwoGroqKey = try CueAPIKeyStore.loadAPIKey(for: .groq)
-        let versionTwoSiliconFlowKey = try CueAPIKeyStore.loadAPIKey(for: .siliconFlow)
         expect(versionTwoOpenAIKey == "openai-v2-key", "schema v2 fixture is readable")
         expect(versionTwoDeepSeekKey == "deepseek-v2-key", "v2 provider key wins")
-        expect(versionTwoMiniMaxKey == "minimax-plan-v2-key", "coding plan keys are readable")
-        expect(versionTwoGroqKey == "groq-v2-key", "platform provider keys are readable")
-        expect(versionTwoSiliconFlowKey == "siliconflow-v2-key", "domestic API keys are readable")
         try CueAPIKeyStore.saveAPIKey("anthropic-key", for: .anthropic)
         try CueAPIKeyStore.removeAPIKey(for: .deepSeek)
         let updated = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
         let updatedKeys = updated?["providerAPIKeys"] as? [String: Any]
         expect(updatedKeys?["deepseek"] == nil, "removing a provider key only removes its v2 entry")
         expect(updatedKeys?["openai"] as? String == "openai-v2-key", "removing one key preserves other providers")
-        expect(updatedKeys?["minimax-cn"] as? String == "minimax-plan-v2-key", "removing preserves coding plan keys")
-        expect(updatedKeys?["groq"] as? String == "groq-v2-key", "removing preserves platform keys")
-        expect(updatedKeys?["siliconflow"] as? String == "siliconflow-v2-key", "removing preserves domestic API keys")
         expect(updatedKeys?["anthropic"] as? String == "anthropic-key", "new providers persist in schema v2")
         expect(updated?["deepSeekAPIKey"] as? String == "legacy-copy-must-survive", "v2 writes preserve legacy source data")
         let removedDeepSeekKey = try CueAPIKeyStore.loadAPIKey(for: .deepSeek)
@@ -1005,7 +716,7 @@ private func runAppTests() async {
             "future schema known provider keys remain readable"
         )
         expectThrows(
-            try CueAPIKeyStore.saveAPIKey("must-not-write", for: .google),
+            try CueAPIKeyStore.saveAPIKey("must-not-write", for: .anthropic),
             "API key writes reject future schemas"
         )
         expectThrows(
@@ -1019,7 +730,7 @@ private func runAppTests() async {
             let corruptData = try fixtureData(named: fixture)
             try corruptData.write(to: url)
             expectThrows(
-                try CueAPIKeyStore.saveAPIKey("must-not-write", for: .openRouter),
+                try CueAPIKeyStore.saveAPIKey("must-not-write", for: .openAI),
                 "\(fixture) rejects writes"
             )
             expectThrows(
@@ -1031,22 +742,31 @@ private func runAppTests() async {
         }
 
         try fixtureData(named: "config-v2.json").write(to: url)
-        CueAPIKeyStore.environmentOverride = ["OPENAI_API_KEY": "environment-openai-key"]
-        let environmentOpenAIKey = try CueAPIKeyStore.loadAPIKey(for: .openAI)
-        expect(environmentOpenAIKey == "environment-openai-key", "environment key takes priority")
-        let environmentSource = try CueAPIKeyStore.source(for: .openAI)
-        let hadStoredOpenAIKey = try CueAPIKeyStore.hasStoredAPIKey(for: .openAI)
-        expect(
-            environmentSource == .environment("OPENAI_API_KEY"),
-            "credential source reports the environment variable"
-        )
-        expect(hadStoredOpenAIKey, "stored key remains visible below environment auth")
+        let originalEnvironmentKey = getenv("OPENAI_API_KEY").map { String(cString: $0) }
+        defer {
+            if let originalEnvironmentKey {
+                setenv("OPENAI_API_KEY", originalEnvironmentKey, 1)
+            } else {
+                unsetenv("OPENAI_API_KEY")
+            }
+        }
+        setenv("OPENAI_API_KEY", "environment-openai-key", 1)
+        let storedKey = try CueAPIKeyStore.loadAPIKey(for: .openAI)
+        let storedSource = try CueAPIKeyStore.source(for: .openAI)
+        expect(storedKey == "openai-v2-key", "stored API key ignores provider environment variables")
+        expect(storedSource == .configuration, "stored credential is the only source")
         try CueAPIKeyStore.removeAPIKey(for: .openAI)
-        let remainingEnvironmentKey = try CueAPIKeyStore.loadAPIKey(for: .openAI)
-        let hasStoredOpenAIKey = try CueAPIKeyStore.hasStoredAPIKey(for: .openAI)
-        expect(remainingEnvironmentKey == "environment-openai-key", "removing local key preserves environment auth")
-        expect(!hasStoredOpenAIKey, "local key is removed independently")
-        CueAPIKeyStore.environmentOverride = [:]
+        let removedKey = try CueAPIKeyStore.loadAPIKey(for: .openAI)
+        let removedSource = try CueAPIKeyStore.source(for: .openAI)
+        let hasStoredKey = try CueAPIKeyStore.hasStoredAPIKey(for: .openAI)
+        expect(removedKey == nil, "environment cannot revive a removed key")
+        expect(removedSource == nil, "environment does not configure a provider")
+        expect(!hasStoredKey, "local key is removed independently")
+        try FileManager.default.removeItem(at: url)
+        let absentProviderKey = try CueAPIKeyStore.loadAPIKey(for: .openAI)
+        let absentProfileKey = try CueAPIKeyStore.loadAPIKey(forProfileID: "openai")
+        expect(absentProviderKey == nil, "environment alone is not a credential")
+        expect(absentProfileKey == nil, "profile credential lookup ignores provider environment variables")
     } catch {
         expect(false, "API key persistence tests should not throw: \(error)")
     }
@@ -1061,11 +781,7 @@ private func runAppTests() async {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         CueAPIKeyStore.configurationURLOverride = url
-        CueAPIKeyStore.environmentOverride = [:]
-        defer {
-            CueAPIKeyStore.configurationURLOverride = nil
-            CueAPIKeyStore.environmentOverride = nil
-        }
+        defer { CueAPIKeyStore.configurationURLOverride = nil }
         try fixtureData(named: "config-v2.json").write(to: url)
 
         let settings = CueSettings(defaults: defaults, aiProviderService: StubAIProviderService())
@@ -1075,12 +791,11 @@ private func runAppTests() async {
         )
         expect(settings.hasStoredCredential(for: .openAI), "stored credential is visible per provider")
         expect(!settings.hasStoredCredential(for: .anthropic), "unconfigured providers have no stored credential")
-        expect(settings.credentialSource(for: .ollama) == nil, "local providers have no credential source")
 
         settings.promptExpansionProvider = .openAI
-        settings.removeCredential(for: .siliconFlow)
+        settings.removeCredential(for: .anthropic)
         expect(
-            settings.credentialSource(for: .siliconFlow) == nil,
+            settings.credentialSource(for: .anthropic) == nil,
             "removing a non-active provider key works from the management list"
         )
         expect(
@@ -1097,9 +812,7 @@ private func runAppTests() async {
         let remaining = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
         let keys = remaining?["providerAPIKeys"] as? [String: Any]
         expect(keys?["deepseek"] as? String == "deepseek-v2-key", "removals preserve unrelated provider keys")
-        expect(keys?["minimax-cn"] as? String == "minimax-plan-v2-key", "removals preserve coding plan keys")
         expect(keys?["openai"] == nil, "active provider key is removed from the document")
-        expect(keys?["siliconflow"] == nil, "management list removal is written through")
     } catch {
         expect(false, "provider credential management tests should not throw: \(error)")
     }
@@ -1226,76 +939,59 @@ private func runAppTests() async {
         expect(false, "window lock persistence fixtures should load: \(error)")
     }
 
-    let englishSuite = "cue-settings-en-\(UUID().uuidString)"
-    let englishDefaults = UserDefaults(suiteName: englishSuite)!
-    defer { englishDefaults.removePersistentDomain(forName: englishSuite) }
-    englishDefaults.set(CueLanguage.english.rawValue, forKey: "language")
-    englishDefaults.set(true, forKey: "inlineCompletionEnabled")
-    englishDefaults.set("legacy-model", forKey: "inlineCompletionModel")
-    englishDefaults.set("legacy-deepseek-model", forKey: "promptExpansionModel")
-    let english = CueSettings(defaults: englishDefaults, aiProviderService: StubAIProviderService())
-    expect(!english.locksPromptWindow, "window resizing is unlocked by default")
-    expect(english.promptExpansionProvider == .deepSeek, "legacy settings default to DeepSeek provider")
-    expect(english.promptExpansionModel == "legacy-deepseek-model", "legacy DeepSeek model remains selected")
-    english.promptExpansionProvider = .openAI
-    english.promptExpansionModel = "gpt-model"
-    english.promptExpansionProvider = .custom
-    english.promptExpansionAPI = .anthropicMessages
-    english.providerBaseURL = "http://localhost:9000"
-    english.promptExpansionModel = "custom-anthropic-model"
-    english.promptExpansionAPI = .openAICompletions
-    english.promptExpansionModel = "custom-openai-model"
-    english.promptExpansionAPI = .anthropicMessages
-    expect(
-        english.promptExpansionModel == "custom-anthropic-model",
-        "models persist independently for each provider API"
+    let profileSuite = "cue-provider-profiles-\(UUID().uuidString)"
+    let profileDefaults = UserDefaults(suiteName: profileSuite)!
+    defer { profileDefaults.removePersistentDomain(forName: profileSuite) }
+    profileDefaults.set(CueLanguage.english.rawValue, forKey: "language")
+    profileDefaults.set(true, forKey: "inlineCompletionEnabled")
+    profileDefaults.set("legacy-model", forKey: "inlineCompletionModel")
+    profileDefaults.set(
+        try! fixtureData(named: "provider-profiles-v1.json"),
+        forKey: "cueProviderProfiles.v1"
     )
-    english.promptExpansionProvider = .openAI
-    expect(english.promptExpansionModel == "gpt-model", "provider switching restores the provider model")
-    english.promptExpansionProvider = .custom
-    expect(english.promptExpansionModel == "custom-anthropic-model", "custom provider model remains independent")
-    expect(english.promptExpansionAPI == .anthropicMessages, "custom provider API persists in settings")
-    expect(english.providerBaseURL == "http://localhost:9000", "custom provider Base URL persists")
-    english.promptExpansionProvider = .cloudflareAIGateway
-    english.promptExpansionAPI = .openAICompletions
-    english.providerBaseURL = "https://gateway.ai.cloudflare.com/v1/account/gateway/compat"
-    english.promptExpansionModel = "workers-model"
-    english.promptExpansionAPI = .openAIResponses
-    english.providerBaseURL = "https://gateway.ai.cloudflare.com/v1/account/gateway/openai"
-    english.promptExpansionModel = "responses-model"
-    english.promptExpansionAPI = .openAICompletions
-    expect(english.promptExpansionModel == "workers-model", "gateway models are isolated by API")
+    let profiles = CueSettings(defaults: profileDefaults, aiProviderService: StubAIProviderService())
+    expect(profiles.providerProfiles.count == 2, "provider profile fixture loads all profiles")
+    expect(profiles.activeProviderProfileID == "custom-local", "profile fixture restores active profile")
+    expect(profiles.activeProviderProfile.modelID == "qwen3", "profile model is restored")
+    expect(!profiles.activeEndpointResolution.isKnown, "custom endpoint uses manual discovery")
     expect(
-        english.providerBaseURL == "https://gateway.ai.cloudflare.com/v1/account/gateway/compat",
-        "gateway Base URLs are isolated by API"
+        profiles.activeEndpointResolution.modelsURL?.absoluteString == "http://localhost:11434/v1/models",
+        "custom profile restores its manual models endpoint"
     )
-    english.promptExpansionAPI = .openAIResponses
-    let reloadedGateway = CueSettings(defaults: englishDefaults, aiProviderService: StubAIProviderService())
-    expect(reloadedGateway.promptExpansionProvider == .cloudflareAIGateway, "gateway provider persists")
-    expect(reloadedGateway.promptExpansionAPI == .openAIResponses, "gateway API persists")
-    expect(reloadedGateway.promptExpansionModel == "responses-model", "gateway API model persists")
+
+    let deepSeek = profiles.providerProfiles.first { $0.id == "deepseek" }!
+    profiles.selectProviderProfile(deepSeek.id)
+    expect(profiles.activeEndpointResolution.isKnown, "known Base URL selects Cue endpoint metadata")
     expect(
-        reloadedGateway.providerBaseURL == "https://gateway.ai.cloudflare.com/v1/account/gateway/openai",
-        "gateway API Base URL persists"
+        profiles.activeEndpointResolution.modelsURL?.absoluteString == "https://api.deepseek.com/models",
+        "known provider models endpoint is generated by the catalog"
     )
-    reloadedGateway.promptExpansionProvider = .custom
-    let reloadedProviders = CueSettings(defaults: englishDefaults, aiProviderService: StubAIProviderService())
-    expect(reloadedProviders.promptExpansionProvider == .custom, "selected provider persists")
-    expect(reloadedProviders.promptExpansionModel == "custom-anthropic-model", "selected provider model persists")
-    reloadedProviders.promptExpansionModel = nil
-    let reloadedWithoutModel = CueSettings(defaults: englishDefaults, aiProviderService: StubAIProviderService())
-    expect(reloadedWithoutModel.promptExpansionModel == nil, "clearing a provider model persists")
+    expect(profiles.canCheckBalance, "known provider exposes balance detection")
+
+    let addedID = profiles.addCustomProviderProfile()
+    expect(profiles.providerProfiles.contains { $0.id == addedID }, "custom profile can be added")
+    expect(profiles.activeProviderProfileID == addedID, "new custom profile becomes active")
+    var added = profiles.activeProviderProfile
+    added.api = .anthropicMessages
+    added.name = "Anthropic Gateway"
+    added.baseURL = "https://gateway.example.test"
+    added.modelID = "claude-test"
+    profiles.updateProviderProfile(added)
+    expect(profiles.activeProviderProfile.api == .anthropicMessages, "custom profile stores API protocol")
+    expect(profiles.activeProviderProfile.modelID == "claude-test", "custom profile stores model")
+    profiles.removeProviderProfile(addedID)
+    expect(!profiles.providerProfiles.contains { $0.id == addedID }, "custom profile can be deleted")
     expect(
-        english.promptExpansionInstruction
+        profiles.promptExpansionInstruction
             == CueLocalization.string(.settingsAIRewriteDefaultPrompt, localization: "en"),
         "English settings use the English rewrite prompt"
     )
-    english.locksPromptWindow = true
-    english.restoreAllSettings()
-    expect(!english.locksPromptWindow, "restoring settings unlocks bottom-edge resizing")
+    profiles.locksPromptWindow = true
+    profiles.restoreAllSettings()
+    expect(!profiles.locksPromptWindow, "restoring settings unlocks bottom-edge resizing")
     expect(
-        englishDefaults.bool(forKey: "inlineCompletionEnabled")
-            && englishDefaults.string(forKey: "inlineCompletionModel") == "legacy-model",
+        profileDefaults.bool(forKey: "inlineCompletionEnabled")
+            && profileDefaults.string(forKey: "inlineCompletionModel") == "legacy-model",
         "removing FIM keeps legacy user-owned settings keys untouched"
     )
 

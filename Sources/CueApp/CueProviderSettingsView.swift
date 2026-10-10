@@ -4,411 +4,304 @@ import SwiftUI
 struct CueProviderSettingsView: View {
     @ObservedObject var settings: CueSettings
     @Binding var providerAPIKey: String
-    @State private var providerSearch = ""
-    @State private var expandedCategories: Set<CueAIProviderCategory>
+    @State private var isConfirmingProfileRemoval = false
+    @State private var isConfirmingCredentialRemoval = false
+    @State private var showAdvanced = false
 
-    init(settings: CueSettings, providerAPIKey: Binding<String>) {
-        self.settings = settings
-        _providerAPIKey = providerAPIKey
-        _expandedCategories = State(
-            initialValue: [settings.promptExpansionProvider.descriptor.category]
-        )
-    }
+    private let customAPIs: [CueAIAPI] = [
+        .openAICompletions,
+        .openAIResponses,
+        .anthropicMessages,
+    ]
 
     var body: some View {
-        HStack(alignment: .top, spacing: 18) {
-            providerBrowser
-                .frame(width: 238)
-                .frame(maxHeight: .infinity)
-
-            ScrollView {
-                providerConfiguration
-                    .frame(maxWidth: .infinity)
-            }
-        }
-        .frame(maxHeight: .infinity, alignment: .top)
-        .onChange(of: settings.promptExpansionProvider) { provider in
-            providerAPIKey = ""
-            expandedCategories.insert(provider.descriptor.category)
-        }
-    }
-
-    private var providerBrowser: some View {
-        CueSettingsCard(
-            settings.localized(.settingsProviderCredentials),
-            detail: settings.localized(.settingsProviderCredentialsHint),
-            fillsAvailableHeight: true
-        ) {
-            VStack(spacing: 12) {
-                HStack(spacing: 7) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField(settings.localized(.settingsSearchProviders), text: $providerSearch)
-                        .textFieldStyle(.plain)
+        Form {
+            Section {
+                Picker(
+                    settings.localized(.settingsProviderCredentials),
+                    selection: $settings.activeProviderProfileID
+                ) {
+                    ForEach(settings.providerProfiles) { profile in
+                        Text(profile.name).tag(profile.id)
+                    }
                 }
-                .padding(.horizontal, 9)
-                .frame(height: 30)
-                .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 7))
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        ForEach(CueAIProviderCategory.allCases, id: \.self) { category in
-                            let providers = filteredProviders(in: category)
-                            if !providers.isEmpty {
-                                VStack(alignment: .leading, spacing: 5) {
-                                    categoryHeader(category, providerCount: providers.count)
+                HStack {
+                    Button(settings.localized(.settingsProviderAdd)) {
+                        _ = settings.addCustomProviderProfile()
+                    }
 
-                                    if categoryIsExpanded(category) {
-                                        ForEach(providers) { descriptor in
-                                            providerRow(descriptor)
-                                        }
-                                    }
-                                }
-                            }
+                    if settings.activeProviderProfile.isCustom {
+                        Button(settings.localized(.settingsProviderDelete), role: .destructive) {
+                            isConfirmingProfileRemoval = true
                         }
                     }
-                }
-                .frame(maxHeight: .infinity)
-            }
-            .frame(maxHeight: .infinity, alignment: .top)
-        }
-    }
-
-    private func categoryHeader(
-        _ category: CueAIProviderCategory,
-        providerCount: Int
-    ) -> some View {
-        Button {
-            guard normalizedProviderSearch.isEmpty else { return }
-            withAnimation(.easeOut(duration: 0.16)) {
-                if expandedCategories.contains(category) {
-                    expandedCategories.remove(category)
-                } else {
-                    expandedCategories.insert(category)
-                }
-            }
-        } label: {
-            HStack(spacing: 7) {
-                Image(systemName: categoryIsExpanded(category) ? "chevron.down" : "chevron.right")
-                    .font(.caption2.weight(.semibold))
-                    .frame(width: 10)
-                Text(providerCategoryName(category))
-                    .font(.caption.weight(.semibold))
-                Text("\(providerCount)")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.tertiary)
-                Spacer()
-            }
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .frame(height: 26)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func categoryIsExpanded(_ category: CueAIProviderCategory) -> Bool {
-        !normalizedProviderSearch.isEmpty || expandedCategories.contains(category)
-    }
-
-    private func providerRow(_ descriptor: CueAIProviderDescriptor) -> some View {
-        let selected = settings.promptExpansionProvider == descriptor.id
-        return HStack(spacing: 3) {
-            Button {
-                settings.promptExpansionProvider = descriptor.id
-            } label: {
-                HStack(spacing: 9) {
-                    Circle()
-                        .fill(credentialStatusColor(for: descriptor.id))
-                        .frame(width: 7, height: 7)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(descriptor.name)
-                            .font(.callout.weight(selected ? .semibold : .regular))
-                            .foregroundStyle(selected ? Color.accentColor : Color.primary)
-                            .lineLimit(1)
-                        Text(credentialStatusText(for: descriptor.id))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    Spacer(minLength: 2)
-
-                    if selected {
-                        Image(systemName: "checkmark")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(Color.accentColor)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .frame(height: 42)
-                .contentShape(Rectangle())
-                .background(
-                    selected ? Color.accentColor.opacity(0.11) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 8)
-                )
-            }
-            .buttonStyle(.plain)
-
-            if settings.hasStoredCredential(for: descriptor.id) {
-                Button {
-                    settings.removeCredential(for: descriptor.id)
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.caption)
-                }
-                .buttonStyle(.borderless)
-                .help(settings.localized(.settingsRemoveAPIKey))
-            }
-        }
-    }
-
-    private var providerConfiguration: some View {
-        CueSettingsCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .center, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(settings.selectedProviderName)
-                            .font(.headline)
-                        Text(settings.promptExpansionAPI.displayName)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                     Spacer()
-                    CueSettingsStatusBadge(
-                        text: credentialStatusText(for: settings.promptExpansionProvider),
-                        color: credentialStatusColor(for: settings.promptExpansionProvider)
-                    )
+                }
+                .confirmationDialog(
+                    settings.localized(.settingsProviderDeleteConfirmation),
+                    isPresented: $isConfirmingProfileRemoval,
+                    titleVisibility: .visible
+                ) {
+                    Button(settings.localized(.settingsProviderDelete), role: .destructive) {
+                        settings.removeProviderProfile(settings.activeProviderProfileID)
+                    }
+                    Button(settings.localized(.settingsCancel), role: .cancel) {}
                 }
 
-                if settings.selectedProviderSupportedAPIs.count > 1 {
-                    configurationLabel(settings.localized(.settingsProviderAPI))
-                    Picker("", selection: $settings.promptExpansionAPI) {
-                        ForEach(settings.selectedProviderSupportedAPIs) { api in
+            }
+
+            if settings.activeProviderProfile.isCustom {
+                Section(settings.localized(.settingsProviderCredentials)) {
+                    Picker(settings.localized(.settingsProviderAPI), selection: profileBinding(\.api)) {
+                        ForEach(customAPIs) { api in
                             Text(api.displayName).tag(api)
                         }
                     }
-                    .labelsHidden()
-                    .frame(maxWidth: .infinity)
-                }
-
-                if settings.providerAllowsBaseURLOverride {
-                    configurationLabel(settings.localized(.settingsProviderBaseURL))
-                    TextField(settings.localized(.settingsProviderBaseURL), text: $settings.providerBaseURL)
-                    Text(settings.localized(baseURLHintKey))
-                        .font(.caption)
-                        .foregroundStyle(settings.providerConfigurationValid ? Color.secondary : Color.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                if supportsCredentialInput {
-                    configurationLabel(
-                        String(
-                            format: settings.localized(.settingsProviderAPIKeyFormat),
-                            settings.selectedProviderName
-                        )
+                    TextField(
+                        settings.localized(.settingsProviderName),
+                        text: profileBinding(\.name)
                     )
-                    HStack(spacing: 8) {
-                        SecureField(
-                            String(
-                                format: settings.localized(.settingsProviderAPIKeyFormat),
-                                settings.selectedProviderName
-                            ),
-                            text: $providerAPIKey
-                        )
-                        Button(settings.localized(.settingsSaveAPIKey)) {
-                            settings.saveProviderAPIKey(providerAPIKey)
-                            providerAPIKey = ""
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(providerAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                }
-
-                Text(credentialDescription)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                configurationLabel(settings.localized(.settingsModel))
-                if !settings.availableModels.isEmpty {
-                    Picker("", selection: $settings.promptExpansionModel) {
-                        Text(settings.localized(.settingsChooseModel)).tag(String?.none)
-                        ForEach(settings.availableModels, id: \.self) {
-                            Text($0).tag(Optional($0))
-                        }
-                    }
-                    .labelsHidden()
-                    .disabled(
-                        !settings.providerCredentialConfigured
-                            && settings.promptExpansionProvider.requiresAPIKey
+                    TextField(
+                        settings.localized(.settingsProviderBaseURL),
+                        text: profileBinding(\.baseURL)
+                    )
+                    TextField(
+                        settings.localized(.settingsProviderModelsURL),
+                        text: optionalProfileBinding(\.manualModelsURL)
+                    )
+                    TextField(
+                        settings.localized(.settingsProviderBalanceURL),
+                        text: optionalProfileBinding(\.manualBalanceURL)
+                    )
+                    TextField(
+                        settings.localized(.settingsProviderBalancePath),
+                        text: profileBinding(\.balanceJSONPointer)
                     )
                 }
+            }
 
-                TextField(
-                    settings.localized(.settingsModelID),
-                    text: Binding(
-                        get: { settings.promptExpansionModel ?? "" },
-                        set: {
-                            let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
-                            settings.promptExpansionModel = trimmed.isEmpty ? nil : trimmed
-                        }
-                    )
-                )
-
+            Section(settings.localized(.settingsModel)) {
                 HStack(spacing: 8) {
-                    if settings.selectedProvider?.supportsModelDiscovery == true {
-                        Button(settings.localized(.settingsRefreshModels)) {
-                            settings.refreshModelsIfPossible()
-                        }
-                        .disabled(
-                            (!settings.providerCredentialConfigured
-                                && settings.promptExpansionProvider.requiresAPIKey)
-                                || settings.isLoadingModels
+                    TextField(
+                        settings.localized(.settingsModelID),
+                        text: Binding(
+                            get: { settings.activeProviderProfile.modelID ?? "" },
+                            set: { value in
+                                let model = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                                updateProfile { $0.modelID = model.isEmpty ? nil : model }
+                            }
                         )
-                    }
+                    )
 
+                    if !settings.availableModels.isEmpty {
+                        Menu {
+                            ForEach(settings.availableModels, id: \.self) { model in
+                                Button(model) {
+                                    updateProfile { $0.modelID = model }
+                                }
+                            }
+                        } label: {
+                            Text(settings.localized(.settingsChooseModel))
+                        }
+                        .fixedSize()
+                    }
+                }
+
+                HStack {
+                    Button(settings.localized(.settingsRefreshModels)) {
+                        settings.refreshModelsIfPossible()
+                    }
+                    if settings.isLoadingModels {
+                        ProgressView().controlSize(.small)
+                    }
+                    Spacer()
+                }
+                .disabled(
+                    !settings.activeEndpointResolution.supportsModelDiscovery
+                        || (!settings.providerCredentialConfigured && settings.activeProviderProfile.requiresAPIKey)
+                        || settings.isLoadingModels
+                )
+            }
+
+            Section(settings.localized(.settingsProviderCredential)) {
+                SecureField(credentialFieldLabel, text: $providerAPIKey)
+
+                HStack {
+                    Button(settings.localized(.settingsSaveAPIKey)) {
+                        settings.saveProviderAPIKey(providerAPIKey)
+                        providerAPIKey = ""
+                    }
+                    .disabled(providerAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    if settings.providerHasStoredCredential {
+                        Button(settings.localized(.settingsRemoveAPIKey), role: .destructive) {
+                            isConfirmingCredentialRemoval = true
+                        }
+                        .confirmationDialog(
+                            settings.localized(.settingsRemoveAPIKeyConfirmation),
+                            isPresented: $isConfirmingCredentialRemoval,
+                            titleVisibility: .visible
+                        ) {
+                            Button(settings.localized(.settingsRemoveAPIKey), role: .destructive) {
+                                settings.removeProviderAPIKey()
+                            }
+                            Button(settings.localized(.settingsCancel), role: .cancel) {}
+                        }
+                    }
+                }
+
+                CueSettingsStatusLabel(
+                    text: credentialStatusText(settings.activeProviderProfile),
+                    color: credentialStatusColor(settings.activeProviderProfile),
+                    systemImage: credentialStatusImage(settings.activeProviderProfile)
+                )
+            }
+
+            Section(settings.localized(.settingsProviderDiagnostics)) {
+                HStack {
                     Button(settings.localized(.settingsHealthCheck)) {
                         settings.checkProviderHealth()
                     }
                     .disabled(
-                        settings.promptExpansionModel == nil
+                        settings.activeProviderProfile.modelID == nil
                             || !settings.providerConfigurationValid
                             || settings.isTestingConnection
-                            || (!settings.providerCredentialConfigured
-                                && settings.promptExpansionProvider.requiresAPIKey)
+                            || (!settings.providerCredentialConfigured && settings.activeProviderProfile.requiresAPIKey)
                     )
 
-                    Spacer()
-
-                    if settings.hasStoredCredential(for: settings.promptExpansionProvider) {
-                        Button(settings.localized(.settingsRemoveAPIKey), role: .destructive) {
-                            settings.removeCredential(for: settings.promptExpansionProvider)
+                    if settings.canCheckBalance {
+                        Button(settings.localized(.settingsCheckBalance)) {
+                            settings.checkProviderBalance()
                         }
+                        .disabled(
+                            settings.isCheckingBalance
+                                || (!settings.providerCredentialConfigured && settings.activeProviderProfile.requiresAPIKey)
+                        )
+                    }
+
+                    Spacer()
+                }
+
+                if settings.isTestingConnection || settings.isCheckingBalance {
+                    ProgressView().controlSize(.small)
+                }
+
+                if let balance = settings.providerBalance {
+                    LabeledContent(settings.localized(.settingsProviderBalance)) {
+                        Text(balanceText(balance)).monospacedDigit()
                     }
                 }
 
                 if let status = settings.aiServiceStatus {
-                    HStack(spacing: 7) {
-                        if settings.isTestingConnection || settings.isLoadingModels {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(
-                                systemName: status.style == .error
-                                    ? "exclamationmark.triangle.fill"
-                                    : "checkmark.circle.fill"
-                            )
-                        }
-                        Text(status.message)
-                    }
-                    .font(.caption)
-                    .foregroundStyle(status.style == .error ? Color.red : Color.secondary)
-                    .padding(9)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        (status.style == .error ? Color.red : Color.accentColor).opacity(0.08),
-                        in: RoundedRectangle(cornerRadius: 8)
+                    CueSettingsStatusLabel(
+                        text: status.message,
+                        color: status.style == .error ? .red : .secondary,
+                        systemImage: status.style == .error ? "exclamationmark.circle" : "info.circle"
                     )
                 }
             }
-        }
-    }
 
-    private var normalizedProviderSearch: String {
-        providerSearch.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func filteredProviders(in category: CueAIProviderCategory) -> [CueAIProviderDescriptor] {
-        let providers = CueAIProviderCatalog.providers(in: category)
-        guard !normalizedProviderSearch.isEmpty else { return providers }
-        return providers.filter {
-            $0.name.localizedCaseInsensitiveContains(normalizedProviderSearch)
-        }
-    }
-
-    private func configurationLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.secondary)
-    }
-
-    private func credentialStatusText(for provider: CueAIProviderID) -> String {
-        if let source = settings.credentialSource(for: provider) {
-            switch source {
-            case .environment(let key):
-                return settings.hasStoredCredential(for: provider)
-                    ? String(
-                        format: settings.localized(.settingsProviderCredentialStatusEnvironmentWithStoredFormat),
-                        key
-                    )
-                    : String(
-                        format: settings.localized(.settingsProviderCredentialStatusEnvironmentFormat),
-                        key
-                    )
-            case .configuration:
-                return settings.localized(.settingsProviderCredentialStatusStored)
+            if !settings.activeProviderProfile.isCustom {
+                Section {
+                    DisclosureGroup(
+                        settings.localized(.settingsAdvanced),
+                        isExpanded: $showAdvanced
+                    ) {
+                        advancedConfiguration
+                    }
+                }
             }
         }
-        if provider.descriptor.authentication == .none {
-            return settings.localized(.settingsProviderCredentialStatusKeyless)
+        .cueSettingsFormAppearance()
+        .onChange(of: settings.activeProviderProfileID) { _ in
+            providerAPIKey = ""
+            showAdvanced = false
         }
-        if provider == .custom {
-            return settings.localized(.settingsProviderCredentialStatusOptional)
-        }
-        return settings.localized(.settingsProviderCredentialStatusNotConfigured)
     }
 
-    private func credentialStatusColor(for provider: CueAIProviderID) -> Color {
-        if settings.credentialSource(for: provider) != nil {
-            return .green
+    private var advancedConfiguration: some View {
+        Group {
+            if !settings.activeProviderProfile.isCustom {
+                TextField(
+                    settings.localized(.settingsProviderBaseURL),
+                    text: profileBinding(\.baseURL)
+                )
+            }
+
+            let resolution = settings.activeEndpointResolution
+            if resolution.isKnown {
+                CueSettingsStatusLabel(
+                    text: settings.localized(.settingsProviderEndpointsDetected),
+                    color: .secondary,
+                    systemImage: "checkmark.circle"
+                )
+            } else {
+                TextField(
+                    settings.localized(.settingsProviderModelsURL),
+                    text: optionalProfileBinding(\.manualModelsURL)
+                )
+                TextField(
+                    settings.localized(.settingsProviderBalanceURL),
+                    text: optionalProfileBinding(\.manualBalanceURL)
+                )
+                TextField(
+                    settings.localized(.settingsProviderBalancePath),
+                    text: profileBinding(\.balanceJSONPointer)
+                )
+            }
         }
-        if provider.descriptor.authentication == .none || provider == .custom {
-            return .secondary
-        }
-        return .orange
     }
 
-    private func providerCategoryName(_ category: CueAIProviderCategory) -> String {
-        let key: CueLocalizedKey = switch category {
-        case .directAPI: .settingsProviderCategoryDirect
-        case .codingPlan: .settingsProviderCategoryCodingPlan
-        case .platform: .settingsProviderCategoryPlatform
-        case .local: .settingsProviderCategoryLocal
-        case .custom: .settingsProviderCategoryCustom
-        }
-        return settings.localized(key)
+    private func profileBinding<Value>(_ keyPath: WritableKeyPath<CueProviderProfile, Value>) -> Binding<Value> {
+        Binding(
+            get: { settings.activeProviderProfile[keyPath: keyPath] },
+            set: { value in updateProfile { $0[keyPath: keyPath] = value } }
+        )
     }
 
-    private var supportsCredentialInput: Bool {
-        settings.promptExpansionProvider.descriptor.authentication != .none
+    private func optionalProfileBinding(_ keyPath: WritableKeyPath<CueProviderProfile, String?>) -> Binding<String> {
+        Binding(
+            get: { settings.activeProviderProfile[keyPath: keyPath] ?? "" },
+            set: { value in updateProfile { $0[keyPath: keyPath] = value.isEmpty ? nil : value } }
+        )
     }
 
-    private var baseURLHintKey: CueLocalizedKey {
-        if settings.promptExpansionProvider == .custom {
-            return .settingsCustomProviderHint
-        }
-        return settings.promptExpansionProvider.requiresAPIKey
-            ? .settingsProviderBaseURLHint
-            : .settingsProviderBaseURLLocalHint
+    private func updateProfile(_ update: (inout CueProviderProfile) -> Void) {
+        var profile = settings.activeProviderProfile
+        update(&profile)
+        settings.updateProviderProfile(profile)
     }
 
-    private var credentialDescription: String {
-        if let environmentKey = settings.providerCredentialEnvironmentKey {
-            let key = settings.providerHasStoredCredential
-                ? CueLocalizedKey.settingsAPIKeyFromEnvironmentWithStoredFormat
-                : .settingsAPIKeyFromEnvironmentFormat
-            return String(format: settings.localized(key), environmentKey)
+    private var credentialFieldLabel: String {
+        String(
+            format: settings.localized(.settingsProviderAPIKeyFormat),
+            settings.activeProviderProfile.name
+        )
+    }
+
+    private func credentialStatusText(_ profile: CueProviderProfile) -> String {
+        if settings.credentialSource(for: profile) != nil {
+            return settings.localized(.settingsProviderCredentialStatusStored)
         }
-        if settings.providerCredentialConfigured {
-            return settings.localized(.settingsAPIKeyConfigured)
+        return profile.requiresAPIKey
+            ? settings.localized(.settingsProviderCredentialStatusNotConfigured)
+            : settings.localized(.settingsProviderCredentialStatusOptional)
+    }
+
+    private func credentialStatusColor(_ profile: CueProviderProfile) -> Color {
+        if settings.credentialSource(for: profile) != nil { return .green }
+        return profile.requiresAPIKey ? .orange : .secondary
+    }
+
+    private func credentialStatusImage(_ profile: CueProviderProfile) -> String {
+        settings.credentialSource(for: profile) == nil ? "circle" : "checkmark.circle"
+    }
+
+    private func balanceText(_ balance: CueProviderBalance) -> String {
+        if let currency = balance.currency {
+            return String(format: "%.4g %@", balance.amount, currency)
         }
-        if settings.promptExpansionProvider == .custom {
-            return settings.localized(.settingsProviderCredentialStatusOptional)
-        }
-        if !settings.promptExpansionProvider.requiresAPIKey {
-            return settings.localized(.settingsLocalProviderHint)
-        }
-        return settings.localized(.settingsAPIKeyNotConfigured)
+        return String(format: "%.4g", balance.amount)
     }
 }

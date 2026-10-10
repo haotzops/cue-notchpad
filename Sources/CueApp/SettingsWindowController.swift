@@ -5,8 +5,8 @@ import SwiftUI
 
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
-    private static let defaultContentSize = NSSize(width: 960, height: 700)
-    private static let minimumContentSize = NSSize(width: 900, height: 560)
+    private static let defaultContentSize = NSSize(width: 880, height: 660)
+    private static let minimumContentSize = NSSize(width: 800, height: 540)
 
     private let settings: CueSettings
     private let targetScreen: NSScreen
@@ -25,16 +25,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        let hostingView = NSHostingView(rootView: CueSettingsView(settings: settings))
-        hostingView.frame = NSRect(origin: .zero, size: Self.defaultContentSize)
-        hostingView.autoresizingMask = [.width, .height]
-        window.contentView = hostingView
+        window.contentViewController = NSHostingController(rootView: CueSettingsView(settings: settings))
         window.setContentSize(Self.defaultContentSize)
         window.contentMinSize = Self.minimumContentSize
         window.isReleasedWhenClosed = false
-        window.titlebarAppearsTransparent = true
-        window.titlebarSeparatorStyle = .none
-        window.toolbarStyle = .unified
+        if #available(macOS 26.0, *) {
+            window.styleMask.insert(.fullSizeContentView)
+            window.titlebarAppearsTransparent = true
+            window.toolbarStyle = .automatic
+        } else {
+            window.toolbarStyle = .unified
+            window.titlebarSeparatorStyle = .line
+        }
         window.animationBehavior = .documentWindow
 
         super.init(window: window)

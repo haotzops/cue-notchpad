@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "activeProfileID": "custom-local",
+  "profiles": [
+    {
+      "api": "openai-completions",
+      "balanceJSONPointer": "/balance",
+      "baseURL": "http://localhost:11434/v1",
+      "id": "custom-local",
+      "kind": "custom",
+      "manualBalanceURL": null,
+      "manualModelsURL": "http://localhost:11434/v1/models",
+      "modelID": "qwen3",
+      "name": "Local Ollama",
+      "providerID": null
+    },
+    {
+      "api": "openai-completions",
+      "balanceJSONPointer": "/balance_infos/0/total_balance",
+      "baseURL": "https://api.deepseek.com",
+      "id": "deepseek",
+      "kind": "builtIn",
+      "manualBalanceURL": null,
+      "manualModelsURL": null,
+      "modelID": null,
+      "name": "DeepSeek",
+      "providerID": "deepseek"
+    }
+  ]
+}

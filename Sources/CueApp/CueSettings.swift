@@ -52,7 +52,9 @@ final class CueSettings: ObservableObject {
     private let piIntegrationService: CuePiIntegrationService
     private var modelRefreshTask: Task<Void, Never>?
     private var healthCheckTask: Task<Void, Never>?
+    private var balanceCheckTask: Task<Void, Never>?
     private var isSynchronizingProviderConfiguration = false
+    private var isSynchronizingProviderProfile = false
 
     @Published var language: CueLanguage {
         didSet { defaults.set(language.rawValue, forKey: Keys.language) }
@@ -111,13 +113,22 @@ final class CueSettings: ObservableObject {
     @Published var promptExpansionProvider: CueAIProviderID {
         didSet {
             defaults.set(promptExpansionProvider.rawValue, forKey: Keys.promptExpansionProvider)
-            guard promptExpansionProvider != oldValue else { return }
+            guard promptExpansionProvider != oldValue,
+                  !isSynchronizingProviderProfile
+            else { return }
+            if let profile = providerProfiles.first(where: { $0.providerID == promptExpansionProvider }) {
+                if activeProviderProfileID != profile.id {
+                    activeProviderProfileID = profile.id
+                }
+                return
+            }
             synchronizeProviderSelection()
         }
     }
     @Published var promptExpansionAPI: CueAIAPI {
         didSet {
             guard !isSynchronizingProviderConfiguration,
+                  !isSynchronizingProviderProfile,
                   promptExpansionAPI != oldValue
             else { return }
             defaults.set(promptExpansionAPI.rawValue, forKey: apiKey(for: promptExpansionProvider))
@@ -155,6 +166,19 @@ final class CueSettings: ObservableObject {
     @Published private(set) var providerCredentialSource: CueAPIKeySource?
     @Published private(set) var providerHasStoredCredential = false
     @Published private(set) var aiServiceStatus: AIServiceStatus?
+    @Published private(set) var providerProfiles: [CueProviderProfile] = []
+    @Published var activeProviderProfileID = CueProviderProfile.defaults[0].id {
+        didSet {
+            guard !isSynchronizingProviderProfile,
+                  activeProviderProfileID != oldValue
+            else { return }
+            defaults.set(activeProviderProfileID, forKey: Keys.activeProviderProfileID)
+            persistProviderProfiles()
+            synchronizeActiveProviderProfile()
+        }
+    }
+    @Published private(set) var providerBalance: CueProviderBalance?
+    @Published private(set) var isCheckingBalance = false
 
     @Published private(set) var piIntegrationState: PiIntegrationState = .notInstalled
     @Published private(set) var piIntegrationErrorMessage: String?
@@ -224,6 +248,12 @@ final class CueSettings: ObservableObject {
         promptExpansionModel = nil
         providerBaseURL = CueAIProviderID.deepSeek.descriptor.endpoints[0].baseURL!.absoluteString
         promptExpansionInstruction = localizedDefaultPromptInstruction()
+        providerProfiles = CueProviderProfile.defaults
+        isSynchronizingProviderProfile = true
+        activeProviderProfileID = CueProviderProfile.defaults[0].id
+        isSynchronizingProviderProfile = false
+        persistProviderProfiles()
+        synchronizeActiveProviderProfile()
         toggleShortcut = .toggleDefault
         previousShortcut = .previousDefault
         nextShortcut = .nextDefault
@@ -316,6 +346,15 @@ final class CueSettings: ObservableObject {
             key: Keys.promptExpansionShortcut,
             fallback: .promptExpansionDefault
         )
+
+        let profileDocument = Self.loadProviderProfiles(from: defaults)
+        providerProfiles = profileDocument.profiles
+        isSynchronizingProviderProfile = true
+        activeProviderProfileID = defaults.string(forKey: Keys.activeProviderProfileID)
+            ?? profileDocument.activeProfileID
+        isSynchronizingProviderProfile = false
+        synchronizeActiveProviderProfile()
+
         piIntegrationState = piIntegrationService.state()
         refreshProviderConfiguration()
     }
@@ -350,30 +389,90 @@ final class CueSettings: ObservableObject {
         refreshPiIntegrationState()
     }
 
+    var activeProviderProfile: CueProviderProfile {
+        providerProfiles.first { $0.id == activeProviderProfileID }
+            ?? providerProfiles.first
+            ?? CueProviderProfile.defaults[0]
+    }
+
     var selectedProvider: CueAIProvider? {
-        guard let baseURL = normalizedProviderBaseURL else { return nil }
-        if promptExpansionProvider == .custom {
-            return .custom(baseURL: baseURL, api: promptExpansionAPI)
-        }
-        return .builtIn(
-            promptExpansionProvider,
-            api: promptExpansionAPI,
-            baseURLOverride: baseURL
+        let profile = activeProviderProfile
+        guard let baseURL = normalizedURL(profile.baseURL) else { return nil }
+        let endpoint = CueProviderEndpointCatalog.resolve(for: profile)
+        let providerID = profile.providerID ?? .custom
+        let authentication = profile.providerID?.descriptor.authentication ?? .apiDefault
+        let knownModels = profile.providerID?.descriptor.endpoint(for: profile.api)?.knownModels ?? []
+        return CueAIProvider(
+            id: providerID,
+            name: profile.name,
+            api: profile.api,
+            baseURL: baseURL,
+            authentication: authentication,
+            supportsModelDiscovery: endpoint.supportsModelDiscovery,
+            knownModels: knownModels,
+            modelsURL: endpoint.modelsURL,
+            balanceURL: endpoint.balanceURL,
+            balanceJSONPointer: endpoint.balanceJSONPointer
         )
     }
 
-    var selectedProviderDescriptor: CueAIProviderDescriptor { promptExpansionProvider.descriptor }
-    var selectedProviderName: String { selectedProviderDescriptor.name }
-    var selectedProviderSupportedAPIs: [CueAIAPI] { selectedProviderDescriptor.supportedAPIs }
-    var providerAllowsBaseURLOverride: Bool { selectedProviderDescriptor.allowsBaseURLOverride }
+    var selectedProviderDescriptor: CueAIProviderDescriptor { activeProviderProfile.providerID?.descriptor ?? CueAIProviderID.custom.descriptor }
+    var selectedProviderName: String { activeProviderProfile.name }
+    var selectedProviderSupportedAPIs: [CueAIAPI] { [activeProviderProfile.api] }
+    var providerAllowsBaseURLOverride: Bool { true }
     var providerCredentialConfigured: Bool { providerCredentialSource != nil }
     var providerCredentialIsRemovable: Bool { providerHasStoredCredential }
-    var providerCredentialEnvironmentKey: String? {
-        guard case .environment(let key) = providerCredentialSource else { return nil }
-        return key
+    var activeEndpointResolution: CueEndpointResolution {
+        CueProviderEndpointCatalog.resolve(for: activeProviderProfile)
+    }
+    var canCheckBalance: Bool { selectedProvider?.balanceURL != nil }
+
+    var providerConfigurationValid: Bool { normalizedURL(activeProviderProfile.baseURL) != nil }
+
+    func selectProviderProfile(_ id: String) {
+        guard providerProfiles.contains(where: { $0.id == id }) else { return }
+        activeProviderProfileID = id
     }
 
-    var providerConfigurationValid: Bool { normalizedProviderBaseURL != nil }
+    @discardableResult
+    func addCustomProviderProfile() -> String {
+        let id = "custom-\(UUID().uuidString.lowercased())"
+        let profile = CueProviderProfile(
+            id: id,
+            kind: .custom,
+            name: "Custom API",
+            providerID: nil,
+            api: .openAICompletions,
+            baseURL: "https://example.com/v1",
+            modelID: nil,
+            manualModelsURL: nil,
+            manualBalanceURL: nil,
+            balanceJSONPointer: "/balance"
+        )
+        providerProfiles.append(profile)
+        persistProviderProfiles()
+        activeProviderProfileID = id
+        return id
+    }
+
+    func updateProviderProfile(_ profile: CueProviderProfile) {
+        guard let index = providerProfiles.firstIndex(where: { $0.id == profile.id }) else { return }
+        providerProfiles[index] = profile
+        persistProviderProfiles()
+        if profile.id == activeProviderProfileID {
+            synchronizeActiveProviderProfile()
+        }
+    }
+
+    func removeProviderProfile(_ id: String) {
+        guard let profile = providerProfiles.first(where: { $0.id == id }), profile.isCustom else { return }
+        providerProfiles.removeAll { $0.id == id }
+        try? CueAPIKeyStore.removeAPIKey(forProfileID: profile.credentialID)
+        persistProviderProfiles()
+        if activeProviderProfileID == id {
+            activeProviderProfileID = providerProfiles.first?.id ?? CueProviderProfile.defaults[0].id
+        }
+    }
 
     func saveProviderAPIKey(_ key: String) {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -382,7 +481,7 @@ final class CueSettings: ObservableObject {
             return
         }
         do {
-            try CueAPIKeyStore.saveAPIKey(trimmed, for: promptExpansionProvider)
+            try CueAPIKeyStore.saveAPIKey(trimmed, forProfileID: activeProviderProfile.credentialID)
             refreshProviderConfiguration()
             setAIServiceStatus(.settingsAPIKeySaved)
             refreshModelsIfPossible()
@@ -403,29 +502,67 @@ final class CueSettings: ObservableObject {
             }
             return
         }
-        let apiKey = try? CueAPIKeyStore.loadAPIKey(for: promptExpansionProvider)
-        guard apiKey != nil || !promptExpansionProvider.requiresAPIKey else {
+        let apiKey = try? CueAPIKeyStore.loadAPIKey(forProfileID: activeProviderProfile.credentialID)
+        guard apiKey != nil || !activeProviderProfile.requiresAPIKey else {
             setAIServiceStatus(.settingsAPIKeyMissing, style: .error)
             return
         }
 
         isTestingConnection = true
         setAIServiceStatus(.settingsCheckingServiceHealth)
+        let requestedProfileID = activeProviderProfileID
         let requestedAPI = provider.api
         healthCheckTask = Task { @MainActor [weak self] in
             defer {
-                if self?.matches(provider.id, api: requestedAPI) == true {
+                if self?.matches(requestedProfileID, api: requestedAPI) == true {
                     self?.isTestingConnection = false
                 }
             }
             do {
                 guard let service = self?.aiProviderService else { return }
                 try await service.validate(provider: provider, apiKey: apiKey, model: model)
-                guard self?.matches(provider.id, api: requestedAPI) == true else { return }
+                guard self?.matches(requestedProfileID, api: requestedAPI) == true else { return }
                 self?.setAIServiceStatus(.settingsServiceHealthy)
             } catch {
-                guard self?.matches(provider.id, api: requestedAPI) == true else { return }
+                guard self?.matches(requestedProfileID, api: requestedAPI) == true else { return }
                 self?.setAIServiceStatus(.settingsAIRewriteUnavailable, style: .error)
+            }
+        }
+    }
+
+    func checkProviderBalance() {
+        guard let provider = selectedProvider,
+              provider.balanceURL != nil,
+              !isCheckingBalance
+        else {
+            setAIServiceStatus(.settingsBalanceUnavailable, style: .error)
+            return
+        }
+        let apiKey = try? CueAPIKeyStore.loadAPIKey(forProfileID: activeProviderProfile.credentialID)
+        guard apiKey != nil || !activeProviderProfile.requiresAPIKey else {
+            setAIServiceStatus(.settingsAPIKeyMissing, style: .error)
+            return
+        }
+
+        isCheckingBalance = true
+        setAIServiceStatus(.settingsCheckingBalance)
+        let requestedProfileID = activeProviderProfileID
+        let requestedAPI = provider.api
+        balanceCheckTask = Task { @MainActor [weak self] in
+            defer {
+                if self?.matches(requestedProfileID, api: requestedAPI) == true {
+                    self?.isCheckingBalance = false
+                }
+            }
+            do {
+                guard let service = self?.aiProviderService else { return }
+                let balance = try await service.balance(provider: provider, apiKey: apiKey)
+                guard self?.matches(requestedProfileID, api: requestedAPI) == true else { return }
+                self?.providerBalance = balance
+                self?.setAIServiceStatus(.settingsBalanceAvailable)
+            } catch {
+                guard self?.matches(requestedProfileID, api: requestedAPI) == true else { return }
+                self?.setAIServiceStatus(.settingsBalanceUnavailable, style: .error)
             }
         }
     }
@@ -435,23 +572,24 @@ final class CueSettings: ObservableObject {
               provider.supportsModelDiscovery,
               !isLoadingModels
         else { return }
-        let apiKey = try? CueAPIKeyStore.loadAPIKey(for: promptExpansionProvider)
-        guard apiKey != nil || !promptExpansionProvider.requiresAPIKey else { return }
+        let apiKey = try? CueAPIKeyStore.loadAPIKey(forProfileID: activeProviderProfile.credentialID)
+        guard apiKey != nil || !activeProviderProfile.requiresAPIKey else { return }
 
         isLoadingModels = true
         setAIServiceStatus(.settingsLoadingModels)
+        let requestedProfileID = activeProviderProfileID
         let requestedAPI = provider.api
         modelRefreshTask = Task { @MainActor [weak self] in
             defer {
-                if self?.matches(provider.id, api: requestedAPI) == true {
+                if self?.matches(requestedProfileID, api: requestedAPI) == true {
                     self?.isLoadingModels = false
                 }
             }
             do {
                 guard let service = self?.aiProviderService else { return }
                 var models = try await service.availableModels(provider: provider, apiKey: apiKey)
-                guard self?.matches(provider.id, api: requestedAPI) == true else { return }
-                if let selectedModel = self?.promptExpansionModel, !models.contains(selectedModel) {
+                guard self?.matches(requestedProfileID, api: requestedAPI) == true else { return }
+                if let selectedModel = self?.activeProviderProfile.modelID, !models.contains(selectedModel) {
                     models.insert(selectedModel, at: 0)
                 }
                 guard !models.isEmpty else {
@@ -461,7 +599,7 @@ final class CueSettings: ObservableObject {
                 self?.availableModels = models
                 self?.aiServiceStatus = nil
             } catch {
-                guard self?.matches(provider.id, api: requestedAPI) == true else { return }
+                guard self?.matches(requestedProfileID, api: requestedAPI) == true else { return }
                 self?.setAIServiceStatus(.settingsAIRewriteUnavailable, style: .error)
             }
         }
@@ -469,9 +607,9 @@ final class CueSettings: ObservableObject {
 
     func removeProviderAPIKey() {
         do {
-            try CueAPIKeyStore.removeAPIKey(for: promptExpansionProvider)
+            try CueAPIKeyStore.removeAPIKey(forProfileID: activeProviderProfile.credentialID)
             refreshProviderConfiguration()
-            setAIServiceStatus(removedCredentialStatus(for: promptExpansionProvider))
+            setAIServiceStatus(.settingsProviderAPIKeyRemoved)
         } catch {
             setAIServiceStatus(error.localizedDescription, style: .error)
         }
@@ -494,31 +632,33 @@ final class CueSettings: ObservableObject {
             if provider == promptExpansionProvider {
                 refreshProviderConfiguration()
             }
-            setAIServiceStatus(removedCredentialStatus(for: provider))
+            setAIServiceStatus(.settingsProviderAPIKeyRemoved)
         } catch {
             setAIServiceStatus(error.localizedDescription, style: .error)
         }
     }
 
-    private func removedCredentialStatus(for provider: CueAIProviderID) -> CueLocalizedKey {
-        (try? CueAPIKeyStore.source(for: provider)) != nil
-            ? .settingsProviderLocalAPIKeyRemoved
-            : .settingsProviderAPIKeyRemoved
-    }
-
     func refreshProviderConfiguration() {
-        providerCredentialSource = try? CueAPIKeyStore.source(for: promptExpansionProvider)
-        providerHasStoredCredential = (try? CueAPIKeyStore.hasStoredAPIKey(for: promptExpansionProvider)) == true
+        providerCredentialSource = try? CueAPIKeyStore.source(forProfileID: activeProviderProfile.credentialID)
+        providerHasStoredCredential = (try? CueAPIKeyStore.hasStoredAPIKey(forProfileID: activeProviderProfile.credentialID)) == true
         guard let provider = selectedProvider else {
             availableModels = []
             return
         }
         availableModels = provider.knownModels
-        if (providerCredentialConfigured || !promptExpansionProvider.requiresAPIKey)
+        if (providerCredentialConfigured || !activeProviderProfile.requiresAPIKey)
             && provider.supportsModelDiscovery
         {
             refreshModelsIfPossible()
         }
+    }
+
+    func credentialSource(for profile: CueProviderProfile) -> CueAPIKeySource? {
+        try? CueAPIKeyStore.source(forProfileID: profile.credentialID)
+    }
+
+    func hasStoredCredential(for profile: CueProviderProfile) -> Bool {
+        (try? CueAPIKeyStore.hasStoredAPIKey(forProfileID: profile.credentialID)) == true
     }
 
     func localized(_ key: CueLocalizedKey) -> String {
@@ -527,10 +667,10 @@ final class CueSettings: ObservableObject {
 
     func expandPrompt(_ text: String, message: String?) async throws -> String? {
         guard let provider = selectedProvider,
-              let model = promptExpansionModel
+              let model = activeProviderProfile.modelID
         else { return nil }
-        let apiKey = try CueAPIKeyStore.loadAPIKey(for: promptExpansionProvider)
-        guard apiKey != nil || !promptExpansionProvider.requiresAPIKey else { return nil }
+        let apiKey = try CueAPIKeyStore.loadAPIKey(forProfileID: activeProviderProfile.credentialID)
+        guard apiKey != nil || !activeProviderProfile.requiresAPIKey else { return nil }
         do {
             let instruction = PromptRewriteTemplate.render(
                 promptExpansionInstruction,
@@ -549,6 +689,39 @@ final class CueSettings: ObservableObject {
             setAIServiceStatus(.settingsAIRewriteUnavailable, style: .error)
             throw error
         }
+    }
+
+    private func synchronizeActiveProviderProfile() {
+        guard let profile = providerProfiles.first(where: { $0.id == activeProviderProfileID }) else { return }
+        resetProviderTasks()
+        isSynchronizingProviderProfile = true
+        promptExpansionProvider = profile.providerID ?? .custom
+        promptExpansionAPI = profile.api
+        promptExpansionModel = profile.modelID
+        providerBaseURL = profile.baseURL
+        isSynchronizingProviderProfile = false
+        refreshProviderConfiguration()
+    }
+
+    private func persistProviderProfiles() {
+        let document = CueProviderProfilesDocument(
+            schemaVersion: CueProviderProfilesDocument.currentSchemaVersion,
+            activeProfileID: activeProviderProfileID,
+            profiles: providerProfiles
+        )
+        guard let data = try? JSONEncoder().encode(document) else { return }
+        defaults.set(data, forKey: Keys.providerProfiles)
+    }
+
+    private static func loadProviderProfiles(from defaults: UserDefaults) -> CueProviderProfilesDocument {
+        guard let data = defaults.data(forKey: Keys.providerProfiles),
+              let document = try? JSONDecoder().decode(CueProviderProfilesDocument.self, from: data),
+              document.schemaVersion == CueProviderProfilesDocument.currentSchemaVersion,
+              !document.profiles.isEmpty
+        else {
+            return .defaults
+        }
+        return document
     }
 
     private func synchronizeProviderSelection() {
@@ -582,14 +755,17 @@ final class CueSettings: ObservableObject {
     private func resetProviderTasks() {
         modelRefreshTask?.cancel()
         healthCheckTask?.cancel()
+        balanceCheckTask?.cancel()
         availableModels = []
         isLoadingModels = false
         isTestingConnection = false
+        isCheckingBalance = false
+        providerBalance = nil
         aiServiceStatus = nil
     }
 
-    private func matches(_ provider: CueAIProviderID, api: CueAIAPI) -> Bool {
-        promptExpansionProvider == provider && promptExpansionAPI == api
+    private func matches(_ profileID: String, api: CueAIAPI) -> Bool {
+        activeProviderProfileID == profileID && activeProviderProfile.api == api
     }
 
     private func modelKey(for provider: CueAIProviderID, api: CueAIAPI) -> String {
@@ -656,7 +832,11 @@ final class CueSettings: ObservableObject {
     }
 
     private var normalizedProviderBaseURL: URL? {
-        let trimmed = providerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        normalizedURL(activeProviderProfile.baseURL)
+    }
+
+    private func normalizedURL(_ value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let components = URLComponents(string: trimmed),
               let scheme = components.scheme?.lowercased(),
               ["http", "https"].contains(scheme),
@@ -708,6 +888,8 @@ final class CueSettings: ObservableObject {
         static let insertsSpacesBetweenChineseAndEnglish = "insertsSpacesBetweenChineseAndEnglish"
         static let promptExpansionProvider = "promptExpansionProvider"
         static let promptExpansionModel = "promptExpansionModel"
+        static let activeProviderProfileID = "activeProviderProfileID"
+        static let providerProfiles = "cueProviderProfiles.v1"
         static let customProviderBaseURL = "customProviderBaseURL"
         static let customProviderAPI = "customProviderAPI"
         static let promptExpansionInstruction = "promptExpansionInstruction"

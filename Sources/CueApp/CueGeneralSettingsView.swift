@@ -7,164 +7,108 @@ struct CueGeneralSettingsView: View {
     @State private var isConfirmingRestoreAll = false
 
     var body: some View {
-        VStack(spacing: 18) {
-            applicationCard
-            windowCard
-            editorCard
-            resetCard
-        }
-    }
-
-    private var applicationCard: some View {
-        CueSettingsCard(settings.localized(.settingsGeneral)) {
-            CueSettingsRow(
-                settings.localized(.settingsLanguage),
-                systemImage: "globe"
-            ) {
-                Picker("", selection: $settings.language) {
+        Form {
+            Section {
+                Picker(settings.localized(.settingsLanguage), selection: $settings.language) {
                     Text(settings.localized(.settingsLanguageSystem)).tag(CueLanguage.system)
                     Text(settings.localized(.languageEnglish)).tag(CueLanguage.english)
                     Text(settings.localized(.languageSimplifiedChinese)).tag(CueLanguage.simplifiedChinese)
                 }
-                .labelsHidden()
+
+                Toggle(
+                    settings.localized(.settingsChineseEnglishSpacing),
+                    isOn: $settings.insertsSpacesBetweenChineseAndEnglish
+                )
+            } header: {
+                Text(settings.localized(.settingsGeneral))
             }
 
-            CueSettingsRow(
-                settings.localized(.settingsChineseEnglishSpacing),
-                detail: settings.localized(.settingsChineseEnglishSpacingHint),
-                systemImage: "textformat"
-            ) {
-                Toggle("", isOn: $settings.insertsSpacesBetweenChineseAndEnglish)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-            }
-        }
-    }
-
-    private var windowCard: some View {
-        CueSettingsCard(settings.localized(.settingsWindowSize)) {
-            CueSettingsRow(
-                "\(settings.localized(.settingsWidth)) × \(settings.localized(.settingsHeight))",
-                detail: settings.localized(.settingsSizeHint),
-                systemImage: "macwindow"
-            ) {
-                HStack(spacing: 8) {
-                    dimensionField(value: $settings.windowWidth)
-                    Text("×")
-                        .foregroundStyle(.tertiary)
-                    dimensionField(value: $settings.windowHeight)
-                    Button {
-                        settings.windowWidth = CueSettings.defaultWindowWidth
-                        settings.windowHeight = CueSettings.defaultWindowHeight
-                    } label: {
-                        Image(systemName: "arrow.counterclockwise")
+            Section {
+                LabeledContent(
+                    "\(settings.localized(.settingsWidth)) × \(settings.localized(.settingsHeight))"
+                ) {
+                    HStack(spacing: 7) {
+                        dimensionField(value: $settings.windowWidth, label: .settingsWidth)
+                        Text("×").foregroundStyle(.secondary)
+                        dimensionField(value: $settings.windowHeight, label: .settingsHeight)
+                        Button {
+                            settings.windowWidth = CueSettings.defaultWindowWidth
+                            settings.windowHeight = CueSettings.defaultWindowHeight
+                        } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(settings.localized(.settingsRestoreDefaultWindowSize))
+                        .accessibilityLabel(settings.localized(.settingsRestoreDefaultWindowSize))
+                        .disabled(
+                            settings.normalizedWidth == CueSettings.defaultWindowWidth
+                                && settings.normalizedHeight == CueSettings.defaultWindowHeight
+                        )
                     }
-                    .help(settings.localized(.settingsRestoreDefaultWindowSize))
-                    .disabled(
-                        settings.normalizedWidth == CueSettings.defaultWindowWidth
-                            && settings.normalizedHeight == CueSettings.defaultWindowHeight
-                    )
                 }
-            }
 
-            CueSettingsRow(
-                settings.localized(.settingsLockWindow),
-                detail: settings.localized(.settingsLockWindowHint),
-                systemImage: settings.locksPromptWindow ? "lock.fill" : "lock.open"
-            ) {
-                Toggle("", isOn: $settings.locksPromptWindow)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-            }
+                Toggle(isOn: $settings.locksPromptWindow) {
+                    Text(settings.localized(.settingsLockWindow))
+                }
 
-            CueSettingsRow(
-                settings.localized(.settingsOverflowBehavior),
-                systemImage: "arrow.up.and.down.text.horizontal"
-            ) {
-                Picker("", selection: $settings.overflowBehavior) {
+                Picker(settings.localized(.settingsOverflowBehavior), selection: $settings.overflowBehavior) {
                     Text(settings.localized(.settingsOverflowScrollable))
                         .tag(CueOverflowBehavior.scrollable)
                     Text(settings.localized(.settingsOverflowGrow))
                         .tag(CueOverflowBehavior.growWithContent)
                 }
-                .labelsHidden()
-                .pickerStyle(.segmented)
+            } header: {
+                Text(settings.localized(.settingsWindowSize))
             }
-        }
-    }
 
-    private var editorCard: some View {
-        CueSettingsCard(settings.localized(.settingsEditor)) {
-            CueSettingsRow(
-                settings.localized(.settingsEditorFont),
-                systemImage: "textformat.size"
-            ) {
-                HStack(spacing: 8) {
-                    Text(editorFontDisplayName)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .frame(maxWidth: 180, alignment: .trailing)
-                        .help(settings.editorFont.fontName)
-                    CueEditorFontPicker(
-                        title: settings.localized(.settingsChooseFont),
-                        font: Binding(
-                            get: { settings.editorFont },
-                            set: { settings.setEditorFont($0) }
+            Section {
+                LabeledContent(settings.localized(.settingsEditorFont)) {
+                    HStack(spacing: 8) {
+                        Text(editorFontDisplayName)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(settings.editorFont.fontName)
+                        CueEditorFontPicker(
+                            title: settings.localized(.settingsChooseFont),
+                            font: Binding(
+                                get: { settings.editorFont },
+                                set: { settings.setEditorFont($0) }
+                            )
                         )
-                    )
-                    Button { settings.restoreDefaultEditorFont() } label: {
-                        Image(systemName: "arrow.counterclockwise")
+                        Button { settings.restoreDefaultEditorFont() } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(settings.localized(.settingsRestoreDefaultFont))
+                        .accessibilityLabel(settings.localized(.settingsRestoreDefaultFont))
                     }
-                    .help(settings.localized(.settingsRestoreDefaultFont))
                 }
+
+                LabeledContent(settings.localized(.settingsEditorFontSize)) {
+                    HStack(spacing: 6) {
+                        CuePointField(
+                            value: $settings.editorFontSize,
+                            unit: settings.localized(.unitPoints),
+                            accessibilityLabel: settings.localized(.settingsEditorFontSize),
+                            spacing: 6
+                        )
+                        Stepper(
+                            "",
+                            value: $settings.editorFontSize,
+                            in: CueSettings.minimumEditorFontSize ... CueSettings.maximumEditorFontSize,
+                            step: 1
+                        )
+                        .labelsHidden()
+                        .accessibilityLabel(settings.localized(.settingsEditorFontSize))
+                    }
+                }
+            } header: {
+                Text(settings.localized(.settingsEditor))
             }
 
-            CueSettingsRow(
-                settings.localized(.settingsEditorFontSize),
-                detail: settings.localized(.settingsEditorFontSizeHint),
-                systemImage: "character.cursor.ibeam"
-            ) {
-                HStack(spacing: 6) {
-                    TextField(
-                        "",
-                        value: $settings.editorFontSize,
-                        format: .number.precision(.fractionLength(0))
-                    )
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 48)
-                    Text(settings.localized(.unitPoints))
-                        .foregroundStyle(.secondary)
-                    Stepper(
-                        "",
-                        value: $settings.editorFontSize,
-                        in: CueSettings.minimumEditorFontSize ... CueSettings.maximumEditorFontSize,
-                        step: 1
-                    )
-                    .labelsHidden()
-                }
-            }
-        }
-    }
-
-    private var resetCard: some View {
-        CueSettingsCard(settings.localized(.settingsResetAndData)) {
-            HStack(spacing: 14) {
-                Image(systemName: "arrow.counterclockwise.circle")
-                    .font(.system(size: 19))
-                    .foregroundStyle(.secondary)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(settings.localized(.settingsRestoreAll))
-                    Text(settings.localized(.settingsRestoreAllDetail))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 20)
-
-                Button(settings.localized(.settingsRestore)) {
+            Section {
+                Button(settings.localized(.settingsRestoreAll), role: .destructive) {
                     isConfirmingRestoreAll = true
                 }
                 .confirmationDialog(
@@ -177,8 +121,11 @@ struct CueGeneralSettingsView: View {
                     }
                     Button(settings.localized(.settingsCancel), role: .cancel) {}
                 }
+            } header: {
+                Text(settings.localized(.settingsResetAndData))
             }
         }
+        .cueSettingsFormAppearance()
     }
 
     private var editorFontDisplayName: String {
@@ -191,18 +138,16 @@ struct CueGeneralSettingsView: View {
         return settings.localized(.settingsSystemFontRegular)
     }
 
-    private func dimensionField(value: Binding<Double>) -> some View {
-        HStack(spacing: 5) {
-            TextField("", value: value, format: .number.precision(.fractionLength(0)))
-                .multilineTextAlignment(.trailing)
-                .frame(width: 58)
-            Text(settings.localized(.unitPoints))
-                .foregroundStyle(.secondary)
-        }
+    private func dimensionField(value: Binding<Double>, label: CueLocalizedKey) -> some View {
+        CuePointField(
+            value: value,
+            unit: settings.localized(.unitPoints),
+            accessibilityLabel: settings.localized(label),
+            spacing: 4
+        )
     }
 }
 
-/// Bridges AppKit's shared font panel into the SwiftUI settings surface.
 private struct CueEditorFontPicker: View {
     let title: String
     @Binding var font: NSFont

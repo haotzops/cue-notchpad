@@ -54,151 +54,104 @@ struct CueUsageStatisticsView: View {
 
     var body: some View {
         let selectedActivity = activity
-        VStack(spacing: 18) {
-            periodCard
-            summaryCards(selectedActivity)
-            activityCard(selectedActivity)
-            dataCard
+        Form {
+            Section {
+                periodControls
+            }
+
+            Section {
+                summaryRows(selectedActivity)
+            }
+
+            Section {
+                activityContent(selectedActivity)
+            } header: {
+                Text(localized(.usageActivity))
+            } footer: {
+                Text(selectedActivity.rangeLabel(locale: locale))
+            }
+
+            Section {
+                dataContent
+            }
         }
+        .cueSettingsFormAppearance()
     }
 
-    private var periodCard: some View {
-        CueSettingsCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Picker("", selection: $period) {
-                    Text(localized(.usageToday)).tag(CueUsagePeriod.day)
-                    Text(localized(.usageWeek)).tag(CueUsagePeriod.week)
-                    Text(localized(.usageMonth)).tag(CueUsagePeriod.month)
-                    Text(localized(.usageCustom)).tag(CueUsagePeriod.custom)
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(maxWidth: .infinity)
+    private var periodControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Picker(localized(.usageActivity), selection: $period) {
+                Text(localized(.usageToday)).tag(CueUsagePeriod.day)
+                Text(localized(.usageWeek)).tag(CueUsagePeriod.week)
+                Text(localized(.usageMonth)).tag(CueUsagePeriod.month)
+                Text(localized(.usageCustom)).tag(CueUsagePeriod.custom)
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(maxWidth: .infinity)
 
-                if period == .custom {
-                    HStack(spacing: 18) {
-                        DatePicker(
-                            localized(.usageStart),
-                            selection: $customStart,
-                            in: ...Date.now,
-                            displayedComponents: .date
-                        )
-                        DatePicker(
-                            localized(.usageEnd),
-                            selection: $customEnd,
-                            in: ...Date.now,
-                            displayedComponents: .date
-                        )
-                        Spacer()
-                    }
-                    .datePickerStyle(.compact)
+            if period == .custom {
+                VStack(alignment: .leading, spacing: 8) {
+                    DatePicker(
+                        localized(.usageStart),
+                        selection: $customStart,
+                        in: ...Date.now,
+                        displayedComponents: .date
+                    )
+                    DatePicker(
+                        localized(.usageEnd),
+                        selection: $customEnd,
+                        in: ...Date.now,
+                        displayedComponents: .date
+                    )
                 }
+                .datePickerStyle(.compact)
             }
         }
     }
 
     @ViewBuilder
-    private func summaryCards(_ activity: CueUsageActivity) -> some View {
-        HStack(spacing: 12) {
-            UsageMetricCard(
-                title: localized(.usageCueOpens),
-                value: "\(activity.totalOpens)",
-                systemImage: "rectangle.and.pencil.and.ellipsis",
-                color: .blue
+    private func summaryRows(_ activity: CueUsageActivity) -> some View {
+        LabeledContent(localized(.usageCueOpens), value: "\(activity.totalOpens)")
+        if activity.dayCount == 1 {
+            LabeledContent(localized(.usageFirstOpen), value: time(activity.firstOpen))
+            LabeledContent(localized(.usageLatestOpen), value: time(activity.latestOpen))
+        } else {
+            LabeledContent(localized(.usageActiveDays), value: "\(activity.activeDays)")
+            LabeledContent(
+                localized(.usageDailyAverage),
+                value: activity.averageOpens.formatted(.number.precision(.fractionLength(1)))
             )
-            if activity.dayCount == 1 {
-                UsageMetricCard(
-                    title: localized(.usageFirstOpen),
-                    value: time(activity.firstOpen),
-                    systemImage: "sunrise.fill",
-                    color: .orange
-                )
-                UsageMetricCard(
-                    title: localized(.usageLatestOpen),
-                    value: time(activity.latestOpen),
-                    systemImage: "clock.fill",
-                    color: .purple
-                )
-            } else {
-                UsageMetricCard(
-                    title: localized(.usageActiveDays),
-                    value: "\(activity.activeDays)",
-                    systemImage: "calendar",
-                    color: .orange
-                )
-                UsageMetricCard(
-                    title: localized(.usageDailyAverage),
-                    value: activity.averageOpens.formatted(.number.precision(.fractionLength(1))),
-                    systemImage: "chart.bar.fill",
-                    color: .purple
-                )
-            }
         }
     }
 
-    private func activityCard(_ activity: CueUsageActivity) -> some View {
-        CueSettingsCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(localized(.usageActivity))
-                        .font(.headline)
-                    Spacer()
-                    Text(activity.rangeLabel(locale: locale))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                if activity.totalOpens == 0 {
-                    VStack(spacing: 8) {
-                        Image(systemName: "chart.bar.xaxis")
-                            .font(.system(size: 26))
-                            .foregroundStyle(.tertiary)
-                        Text(localized(.usageNoActivity))
-                            .font(.callout.weight(.medium))
-                        Text(localized(.usageNoActivityHint))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 138)
-                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
-                } else {
-                    UsageActivityChart(
-                        activity: activity,
-                        locale: locale,
-                        valueLabel: localized(.usageCueOpens)
-                    )
-                    .frame(height: 150)
-                }
-            }
-        }
-    }
-
-    private var dataCard: some View {
-        CueSettingsCard {
-            HStack(spacing: 14) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.green)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(localized(.usagePrivacyHint))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(localized(.settingsClearUsageDetail))
-                        .font(.caption)
+    private func activityContent(_ activity: CueUsageActivity) -> some View {
+        Group {
+            if activity.totalOpens == 0 {
+                VStack(spacing: 8) {
+                    Image(systemName: "chart.bar.xaxis")
+                        .font(.system(size: 24))
                         .foregroundStyle(.tertiary)
+                    Text(localized(.usageNoActivity))
+                        .font(.callout.weight(.medium))
                 }
-
-                Spacer(minLength: 18)
-
-                Button(localized(.settingsClearUsage), role: .destructive) {
-                    isConfirmingUsageClear = true
-                }
-                .disabled(usage.cueOpenCount == 0 && usage.records.isEmpty)
+                .frame(maxWidth: .infinity, minHeight: 138)
+            } else {
+                UsageActivityChart(
+                    activity: activity,
+                    locale: locale,
+                    valueLabel: localized(.usageCueOpens)
+                )
+                .frame(height: 150)
             }
         }
+    }
+
+    private var dataContent: some View {
+        Button(localized(.settingsClearUsage), role: .destructive) {
+            isConfirmingUsageClear = true
+        }
+        .disabled(usage.cueOpenCount == 0 && usage.records.isEmpty)
         .confirmationDialog(
             localized(.settingsClearUsageConfirmation),
             isPresented: $isConfirmingUsageClear,
@@ -222,41 +175,6 @@ struct CueUsageStatisticsView: View {
 
     private func localized(_ key: CueLocalizedKey) -> String {
         CueLocalization.string(key, localization: settings.localizationIdentifier)
-    }
-}
-
-private struct UsageMetricCard: View {
-    let title: String
-    let value: String
-    let systemImage: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(color)
-                .frame(width: 34, height: 34)
-                .background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: 9))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(value)
-                    .font(.system(size: 21, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-        }
     }
 }
 

@@ -31,13 +31,21 @@ fi
 }
 
 cd "$ROOT"
+# SwiftPM's link-only Clang invocation needs -isysroot as a Clang linker
+# argument; --sdk alone leaves LC_BUILD_VERSION's SDK at the deployment target.
+SDKROOT="$(xcrun --show-sdk-path)"
+sdk_args=(
+    --sdk "$SDKROOT"
+    -Xswiftc -Xclang-linker -Xswiftc -isysroot
+    -Xswiftc -Xclang-linker -Xswiftc "$SDKROOT"
+)
 "$ROOT/Scripts/generate-tokenizer-index.py"
 
 RESOURCE_BIN_DIR=""
 if [[ -z "$ARCHS" ]]; then
-    swift build -c "$CONFIGURATION" --product cue
-    swift build -c "$CONFIGURATION" --product cue-host
-    RESOURCE_BIN_DIR="$(swift build -c "$CONFIGURATION" --show-bin-path)"
+    swift build -c "$CONFIGURATION" "${sdk_args[@]}" --product cue
+    swift build -c "$CONFIGURATION" "${sdk_args[@]}" --product cue-host
+    RESOURCE_BIN_DIR="$(swift build -c "$CONFIGURATION" "${sdk_args[@]}" --show-bin-path)"
 
     rm -rf "$APP"
     mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -57,7 +65,7 @@ else
 
         scratch_path="$ROOT/.build/release-$arch"
         triple="$arch-apple-macosx$MINIMUM_MACOS_VERSION"
-        build_args=(-c "$CONFIGURATION" --triple "$triple" --scratch-path "$scratch_path")
+        build_args=(-c "$CONFIGURATION" --triple "$triple" --scratch-path "$scratch_path" "${sdk_args[@]}")
         swift build "${build_args[@]}" --product cue
         swift build "${build_args[@]}" --product cue-host
         bin_dir="$(swift build "${build_args[@]}" --show-bin-path)"
@@ -74,6 +82,21 @@ else
         xcrun lipo -create "${host_binaries[@]}" -output "$APP/Contents/MacOS/cue-host"
     fi
 fi
+
+# A recent SDK in LC_BUILD_VERSION is required for native system appearance on
+# newer macOS; a deployment target of 13 must not change this metadata.
+python3 - "$APP/Contents/MacOS/cue-host" "$MINIMUM_MACOS_VERSION" "$SDKROOT" <<'PY'
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+binary, minimum, sdk_root = sys.argv[1:]
+actual = subprocess.check_output(["xcrun", "vtool", "-show-build", binary], text=True)
+version = json.loads(Path(sdk_root, "SDKSettings.json").read_text())["Version"]
+if f"minos {minimum}" not in actual or f"sdk {version}" not in actual:
+    raise SystemExit(f"Incorrect cue-host platform version (expected minOS {minimum}, SDK {version}):\n{actual}")
+PY
 
 cp "$INFO_PLIST" "$APP/Contents/Info.plist"
 "$PLIST_BUDDY" -c "Set :CFBundleShortVersionString $RELEASE_VERSION" "$APP/Contents/Info.plist"
@@ -118,13 +141,21 @@ PY
 # extension allowlist.
 shopt -s nullglob
 for resource_bundle in "$RESOURCE_BIN_DIR"/CueNotchpad_*.bundle; do
+    # SwiftPM may emit a flat resource directory or a macOS bundle with the
+    # runtime files under Contents/Resources. Copy only runtime resources into
+    # the app's conventional Resources directory; bundle metadata and code
+    # signatures must not become nested app resources.
+    resource_root="$resource_bundle"
+    if [[ -d "$resource_bundle/Contents/Resources" ]]; then
+        resource_root="$resource_bundle/Contents/Resources"
+    fi
+
     while IFS= read -r -d '' resource; do
-        relative_path="${resource#"$resource_bundle/"}"
-        [[ "$relative_path" == "Info.plist" ]] && continue
+        relative_path="${resource#"$resource_root/"}"
         destination="$APP/Contents/Resources/$relative_path"
         mkdir -p "$(dirname "$destination")"
         cp -R "$resource" "$destination"
-    done < <(find "$resource_bundle" -mindepth 1 -maxdepth 1 -print0)
+    done < <(find "$resource_root" -mindepth 1 -maxdepth 1 -print0)
 done
 shopt -u nullglob
 

@@ -5,48 +5,41 @@ struct CueShortcutSettingsView: View {
     @ObservedObject var settings: CueSettings
 
     var body: some View {
-        CueSettingsCard(
-            settings.localized(.settingsShortcuts),
-            detail: settings.localized(.settingsPageShortcutsDetail)
-        ) {
-            VStack(spacing: 0) {
+        Form {
+            Section(settings.localized(.settingsShortcuts)) {
                 shortcutRow(
                     settings.localized(.shortcutToggle),
-                    systemImage: "rectangle.on.rectangle",
                     shortcut: $settings.toggleShortcut
                 )
                 shortcutRow(
                     settings.localized(.shortcutPrevious),
-                    systemImage: "arrow.left",
                     shortcut: $settings.previousShortcut
                 )
                 shortcutRow(
                     settings.localized(.shortcutNext),
-                    systemImage: "arrow.right",
                     shortcut: $settings.nextShortcut
                 )
                 shortcutRow(
                     settings.localized(.settingsAIRewrite),
-                    systemImage: "sparkles",
                     shortcut: $settings.promptExpansionShortcut
                 )
             }
         }
+        .cueSettingsFormAppearance()
     }
 
     private func shortcutRow(
         _ label: String,
-        systemImage: String,
-        shortcut: Binding<CueShortcut>,
-        allowsUnmodifiedKeys: Bool = false
+        shortcut: Binding<CueShortcut>
     ) -> some View {
-        CueSettingsRow(label, systemImage: systemImage) {
+        LabeledContent(label) {
             CueShortcutRecorder(
                 shortcut: shortcut,
                 recordingPrompt: settings.localized(.shortcutRecord),
-                allowsUnmodifiedKeys: allowsUnmodifiedKeys
+                allowsUnmodifiedKeys: false
             )
             .frame(width: 122, height: 28)
+            .accessibilityLabel(label)
         }
     }
 }

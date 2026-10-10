@@ -1,8 +1,14 @@
 import CueCore
 import Foundation
 
+struct CueProviderBalance: Equatable, Sendable {
+    let amount: Double
+    let currency: String?
+}
+
 protocol AIProviderService: Sendable {
     func availableModels(provider: CueAIProvider, apiKey: String?) async throws -> [String]
+    func balance(provider: CueAIProvider, apiKey: String?) async throws -> CueProviderBalance
     func validate(provider: CueAIProvider, apiKey: String?, model: String) async throws
     func rewritePrompt(
         _ text: String,
@@ -15,12 +21,16 @@ protocol AIProviderService: Sendable {
 
 enum AIProviderError: LocalizedError, Equatable, Sendable {
     case invalidResponse
+    case invalidBalanceResponse
+    case balanceUnavailable
     case httpStatus(Int)
     case invalidBaseURL
 
     var errorDescription: String? {
         switch self {
         case .invalidResponse: "The model provider returned an invalid response."
+        case .invalidBalanceResponse: "The balance response does not contain a numeric balance."
+        case .balanceUnavailable: "Balance detection is not configured for this provider."
         case .httpStatus(let status): "The model provider returned HTTP \(status)."
         case .invalidBaseURL: "The provider base URL is invalid."
         }
@@ -48,21 +58,27 @@ actor HTTPAIProviderService: AIProviderService {
         try validate(response)
         let discovered: [String]
         switch provider.api {
-        case .googleGenerativeAI:
-            let list = try JSONDecoder().decode(GoogleModelList.self, from: data)
-            discovered = list.models.compactMap { model in
-                let id = model.name.removingPrefix("models/")
-                guard !id.isEmpty,
-                      model.supportedGenerationMethods?.contains("generateContent") != false
-                else { return nil }
-                return id
-            }
         case .openAICompletions, .openAIResponses, .anthropicMessages:
             discovered = try JSONDecoder().decode(OpenAIModelList.self, from: data).data.map(\.id)
-        case .azureOpenAIResponses, .googleVertexAI, .bedrockConverse:
-            discovered = []
         }
         return uniqueSorted(provider.knownModels + discovered)
+    }
+
+    func balance(provider: CueAIProvider, apiKey: String?) async throws -> CueProviderBalance {
+        guard let endpoint = provider.balanceURL else {
+            throw AIProviderError.balanceUnavailable
+        }
+        var request = URLRequest(url: endpoint)
+        applyAuthentication(provider: provider, apiKey: apiKey, to: &request)
+        let (data, response) = try await session.data(for: request)
+        try validate(response)
+        let object = try JSONSerialization.jsonObject(with: data)
+        guard let numeric = value(at: provider.balanceJSONPointer, in: object) as? NSNumber else {
+            throw AIProviderError.invalidBalanceResponse
+        }
+        let currency = value(at: "/currency", in: object) as? String
+            ?? value(at: "/data/currency", in: object) as? String
+        return CueProviderBalance(amount: numeric.doubleValue, currency: currency)
     }
 
     func validate(provider: CueAIProvider, apiKey: String?, model: String) async throws {
@@ -96,7 +112,7 @@ actor HTTPAIProviderService: AIProviderService {
         case .openAICompletions:
             content = try JSONDecoder().decode(OpenAIChatCompletion.self, from: data)
                 .choices.first?.message.content
-        case .openAIResponses, .azureOpenAIResponses:
+        case .openAIResponses:
             let response = try JSONDecoder().decode(OpenAIResponse.self, from: data)
             content = response.output
                 .filter { $0.type == "message" && $0.role == "assistant" }
@@ -107,12 +123,6 @@ actor HTTPAIProviderService: AIProviderService {
         case .anthropicMessages:
             content = try JSONDecoder().decode(AnthropicMessage.self, from: data)
                 .content.filter { $0.type == "text" }.compactMap(\.text).joined()
-        case .googleGenerativeAI, .googleVertexAI:
-            content = try JSONDecoder().decode(GoogleGenerateContentResponse.self, from: data)
-                .candidates.first?.content.parts.compactMap(\.text).joined()
-        case .bedrockConverse:
-            content = try JSONDecoder().decode(BedrockConverseResponse.self, from: data)
-                .output.message.content.compactMap(\.text).joined()
         }
         guard let content, !content.isEmpty else { throw AIProviderError.invalidResponse }
         return content
@@ -120,15 +130,15 @@ actor HTTPAIProviderService: AIProviderService {
 
     private func makeModelsRequest(provider: CueAIProvider, apiKey: String?) throws -> URLRequest {
         let endpoint: URL
-        switch provider.api {
-        case .googleGenerativeAI:
-            endpoint = provider.baseURL.appendingPathComponent("models")
-        case .anthropicMessages:
-            endpoint = provider.baseURL.appendingPathComponent("v1/models")
-        case .openAICompletions, .openAIResponses:
-            endpoint = provider.baseURL.appendingPathComponent("models")
-        case .azureOpenAIResponses, .googleVertexAI, .bedrockConverse:
-            throw AIProviderError.invalidBaseURL
+        if let modelsURL = provider.modelsURL {
+            endpoint = modelsURL
+        } else {
+            switch provider.api {
+            case .anthropicMessages:
+                endpoint = provider.baseURL.appendingPathComponent("v1/models")
+            case .openAICompletions, .openAIResponses:
+                endpoint = provider.baseURL.appendingPathComponent("models")
+            }
         }
         var request = URLRequest(url: endpoint)
         applyAuthentication(provider: provider, apiKey: apiKey, to: &request)
@@ -154,7 +164,7 @@ actor HTTPAIProviderService: AIProviderService {
                     .init(role: "user", content: text),
                 ]
             ))
-        case .openAIResponses, .azureOpenAIResponses:
+        case .openAIResponses:
             endpoint = provider.baseURL.appendingPathComponent("responses")
             body = try JSONEncoder().encode(OpenAIResponsesRequest(
                 model: model,
@@ -168,25 +178,6 @@ actor HTTPAIProviderService: AIProviderService {
                 system: instruction,
                 messages: [.init(role: "user", content: text)]
             ))
-        case .googleGenerativeAI:
-            endpoint = provider.baseURL
-                .appendingPathComponent("models")
-                .appendingPathComponent("\(model):generateContent")
-            body = try googleRequestBody(instruction: instruction, text: text)
-        case .googleVertexAI:
-            endpoint = provider.baseURL
-                .appendingPathComponent("models")
-                .appendingPathComponent("\(model):generateContent")
-            body = try googleRequestBody(instruction: instruction, text: text)
-        case .bedrockConverse:
-            endpoint = provider.baseURL
-                .appendingPathComponent("model")
-                .appendingPathComponent(model)
-                .appendingPathComponent("converse")
-            body = try JSONEncoder().encode(BedrockConverseRequest(
-                system: [.init(text: instruction)],
-                messages: [.init(role: "user", content: [.init(text: text)])]
-            ))
         }
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -197,12 +188,6 @@ actor HTTPAIProviderService: AIProviderService {
         return request
     }
 
-    private func googleRequestBody(instruction: String, text: String) throws -> Data {
-        try JSONEncoder().encode(GoogleGenerateContentRequest(
-            systemInstruction: .init(parts: [.init(text: instruction)]),
-            contents: [.init(role: "user", parts: [.init(text: text)])]
-        ))
-    }
 
     private func applyAuthentication(
         provider: CueAIProvider,
@@ -216,21 +201,11 @@ actor HTTPAIProviderService: AIProviderService {
         switch provider.authentication {
         case .none:
             break
-        case .azureAPIKey:
-            request.setValue(apiKey, forHTTPHeaderField: "api-key")
-        case .cloudflareAIGateway:
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "cf-aig-authorization")
-        case .bearer:
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        case .googleAPIKey:
-            request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         case .apiDefault:
             switch provider.api {
             case .anthropicMessages:
                 request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-            case .googleGenerativeAI, .googleVertexAI:
-                request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
-            case .openAICompletions, .openAIResponses, .azureOpenAIResponses, .bedrockConverse:
+            case .openAICompletions, .openAIResponses:
                 request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
             }
         }
@@ -238,6 +213,25 @@ actor HTTPAIProviderService: AIProviderService {
 
     private func uniqueSorted(_ models: [String]) -> [String] {
         Array(Set(models.filter { !$0.isEmpty })).sorted()
+    }
+
+    private func value(at pointer: String, in object: Any) -> Any? {
+        guard pointer.isEmpty || pointer.first == "/" else { return nil }
+        var current: Any = object
+        for component in pointer.split(separator: "/", omittingEmptySubsequences: true) {
+            let key = component
+                .replacingOccurrences(of: "~1", with: "/")
+                .replacingOccurrences(of: "~0", with: "~")
+            if let dictionary = current as? [String: Any] {
+                guard let next = dictionary[String(key)] else { return nil }
+                current = next
+            } else if let array = current as? [Any], let index = Int(key), array.indices.contains(index) {
+                current = array[index]
+            } else {
+                return nil
+            }
+        }
+        return current
     }
 
     private func validate(_ response: URLResponse) throws {
@@ -253,13 +247,6 @@ private struct OpenAIModelList: Decodable {
     let data: [Model]
 }
 
-private struct GoogleModelList: Decodable {
-    struct Model: Decodable {
-        let name: String
-        let supportedGenerationMethods: [String]?
-    }
-    let models: [Model]
-}
 
 private struct OpenAIChatRequest: Encodable {
     struct Message: Encodable { let role: String; let content: String }
@@ -312,60 +299,4 @@ private struct AnthropicMessagesRequest: Encodable {
 private struct AnthropicMessage: Decodable {
     struct Content: Decodable { let type: String; let text: String? }
     let content: [Content]
-}
-
-private struct GoogleGenerateContentRequest: Encodable {
-    struct Content: Encodable {
-        struct Part: Encodable { let text: String }
-        let role: String?
-        let parts: [Part]
-
-        init(role: String? = nil, parts: [Part]) {
-            self.role = role
-            self.parts = parts
-        }
-    }
-    let systemInstruction: Content
-    let contents: [Content]
-}
-
-private struct GoogleGenerateContentResponse: Decodable {
-    struct Candidate: Decodable {
-        struct Content: Decodable {
-            struct Part: Decodable { let text: String? }
-            let parts: [Part]
-        }
-        let content: Content
-    }
-    let candidates: [Candidate]
-}
-
-private struct BedrockConverseRequest: Encodable {
-    struct Content: Encodable { let text: String }
-    struct Message: Encodable {
-        let role: String
-        let content: [Content]
-    }
-    let system: [Content]
-    let messages: [Message]
-    let inferenceConfig = InferenceConfig(maxTokens: 4096)
-
-    struct InferenceConfig: Encodable { let maxTokens: Int }
-}
-
-private struct BedrockConverseResponse: Decodable {
-    struct Output: Decodable {
-        struct Message: Decodable {
-            struct Content: Decodable { let text: String? }
-            let content: [Content]
-        }
-        let message: Message
-    }
-    let output: Output
-}
-
-private extension String {
-    func removingPrefix(_ prefix: String) -> String {
-        hasPrefix(prefix) ? String(dropFirst(prefix.count)) : self
-    }
 }

@@ -1,9 +1,8 @@
 import CueCore
 import Foundation
 
-/// Resolves provider credentials from the provider's environment variables first,
-/// then the user-owned local configuration file. The file remains at the stable
-/// Cue path and is restricted to the current user (0600).
+/// Resolves provider credentials from the user-owned local configuration file.
+/// The file remains at the stable Cue path and is restricted to the current user (0600).
 enum CueAPIKeyStoreError: LocalizedError {
     case unsupportedSchema
     case corruptConfiguration
@@ -19,16 +18,13 @@ enum CueAPIKeyStoreError: LocalizedError {
 }
 
 enum CueAPIKeySource: Equatable {
-    case environment(String)
     case configuration
 }
 
 enum CueAPIKeyStore {
     static let currentSchemaVersion = 2
-    /// Test-only overrides; production uses the stable Application Support path
-    /// and the process environment.
+    /// Test-only override; production uses the stable Application Support path.
     static var configurationURLOverride: URL?
-    static var environmentOverride: [String: String]?
 
     private static var fileURL: URL {
         if let configurationURLOverride { return configurationURLOverride }
@@ -73,10 +69,39 @@ enum CueAPIKeyStore {
     }
 
     static func removeAPIKey(for provider: CueAIProviderID) throws {
+        try removeAPIKey(forProfileID: provider.rawValue)
+    }
+
+    static func loadAPIKey(forProfileID profileID: String) throws -> String? {
+        try resolveAPIKey(forProfileID: profileID)?.key
+    }
+
+    static func source(forProfileID profileID: String) throws -> CueAPIKeySource? {
+        try resolveAPIKey(forProfileID: profileID)?.source
+    }
+
+    static func hasStoredAPIKey(forProfileID profileID: String) throws -> Bool {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return false }
+        let document = try configuration(at: fileURL)
+        guard let keys = try providerKeys(in: document),
+              let key = keys[profileID] as? String
+        else { return false }
+        return !key.isEmpty
+    }
+
+    static func saveAPIKey(_ key: String, forProfileID profileID: String) throws {
+        var document = try writableConfiguration()
+        var keys = try providerKeys(in: document) ?? [:]
+        keys[profileID] = key
+        document["providerAPIKeys"] = keys
+        try persist(document)
+    }
+
+    static func removeAPIKey(forProfileID profileID: String) throws {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
         var document = try writableConfiguration()
         var keys = try providerKeys(in: document) ?? [:]
-        keys.removeValue(forKey: provider.rawValue)
+        keys.removeValue(forKey: profileID)
         document["providerAPIKeys"] = keys
         try persist(document)
     }
@@ -84,25 +109,25 @@ enum CueAPIKeyStore {
     private static func resolveAPIKey(
         for provider: CueAIProviderID
     ) throws -> (key: String, source: CueAPIKeySource)? {
-        let environment = environmentOverride ?? ProcessInfo.processInfo.environment
-        for environmentKey in provider.environmentKeys {
-            if let value = environment[environmentKey], !value.isEmpty {
-                return (value, .environment(environmentKey))
-            }
-        }
+        try resolveAPIKey(forProfileID: provider.rawValue, legacyProvider: provider)
+    }
+
+    private static func resolveAPIKey(
+        forProfileID profileID: String,
+        legacyProvider: CueAIProviderID? = nil
+    ) throws -> (key: String, source: CueAPIKeySource)? {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
         let document = try configuration(at: fileURL)
         if let keys = try providerKeys(in: document),
-           let key = keys[provider.rawValue] as? String,
+           let key = keys[profileID] as? String,
            !key.isEmpty
         {
             return (key, .configuration)
         }
-        // Schema v1 compatibility. Once a v2 document exists, providerAPIKeys
-        // is authoritative so deleting DeepSeek does not revive this legacy copy.
+        // The legacy field remains readable only for the existing provider API.
         let version = document["schemaVersion"] as? Int ?? 0
         if version < currentSchemaVersion,
-           provider == .deepSeek,
+           legacyProvider == .deepSeek,
            let key = document["deepSeekAPIKey"] as? String,
            !key.isEmpty
         {
