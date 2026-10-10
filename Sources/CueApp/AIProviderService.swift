@@ -69,16 +69,18 @@ actor HTTPAIProviderService: AIProviderService {
             throw AIProviderError.balanceUnavailable
         }
         var request = URLRequest(url: endpoint)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         applyAuthentication(provider: provider, apiKey: apiKey, to: &request)
         let (data, response) = try await session.data(for: request)
         try validate(response)
         let object = try JSONSerialization.jsonObject(with: data)
-        guard let numeric = value(at: provider.balanceJSONPointer, in: object) as? NSNumber else {
+        guard let amount = numericValue(at: provider.balanceJSONPointer, in: object) else {
             throw AIProviderError.invalidBalanceResponse
         }
-        let currency = value(at: "/currency", in: object) as? String
+        let currency = value(at: "/balance_infos/0/currency", in: object) as? String
+            ?? value(at: "/currency", in: object) as? String
             ?? value(at: "/data/currency", in: object) as? String
-        return CueProviderBalance(amount: numeric.doubleValue, currency: currency)
+        return CueProviderBalance(amount: amount, currency: currency)
     }
 
     func validate(provider: CueAIProvider, apiKey: String?, model: String) async throws {
@@ -213,6 +215,17 @@ actor HTTPAIProviderService: AIProviderService {
 
     private func uniqueSorted(_ models: [String]) -> [String] {
         Array(Set(models.filter { !$0.isEmpty })).sorted()
+    }
+
+    private func numericValue(at pointer: String, in object: Any) -> Double? {
+        switch value(at: pointer, in: object) {
+        case let number as NSNumber:
+            number.doubleValue
+        case let string as String:
+            Double(string.trimmingCharacters(in: .whitespacesAndNewlines))
+        default:
+            nil
+        }
     }
 
     private func value(at pointer: String, in object: Any) -> Any? {

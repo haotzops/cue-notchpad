@@ -620,6 +620,25 @@ private func runAppTests() async {
         )
         expect(completionResult == "chat rewrite", "DeepSeek completions text is decoded")
 
+        let balanceProvider = CueAIProvider.custom(
+            baseURL: URL(string: "https://api.deepseek.com")!,
+            api: .openAICompletions,
+            balanceURL: URL(string: "https://api.deepseek.com/user/balance")!,
+            balanceJSONPointer: "/balance_infos/0/total_balance"
+        )
+        let balanceService = makeMockProviderService { request in
+            expect(request.url?.absoluteString == "https://api.deepseek.com/user/balance", "DeepSeek uses the user balance endpoint")
+            expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer deepseek-key", "DeepSeek balance uses bearer auth")
+            expect(request.value(forHTTPHeaderField: "Accept") == "application/json", "Balance requests accept JSON")
+            return successfulResponse(
+                for: request,
+                json: #"{"is_available":true,"balance_infos":[{"currency":"CNY","total_balance":"110.00"}]}"#
+            )
+        }
+        let balance = try await balanceService.balance(provider: balanceProvider, apiKey: "deepseek-key")
+        expect(balance.amount == 110, "DeepSeek string balance is decoded as a number")
+        expect(balance.currency == "CNY", "DeepSeek balance currency is decoded from balance_infos")
+
         let anthropic = CueAIProvider.builtIn(.anthropic)!
         let anthropicService = makeMockProviderService { request in
             expect(request.url?.absoluteString == "https://api.anthropic.com/v1/messages", "Anthropic uses Messages endpoint")
@@ -666,67 +685,42 @@ private func runAppTests() async {
         CueAPIKeyStore.configurationURLOverride = url
         defer { CueAPIKeyStore.configurationURLOverride = nil }
 
-        let versionOneData = try fixtureData(named: "config-v1.json")
-        try versionOneData.write(to: url)
-        let versionOneDeepSeekKey = try CueAPIKeyStore.loadAPIKey(for: .deepSeek)
+        let legacyData = try fixtureData(named: "config-legacy.json")
+        try legacyData.write(to: url)
+        let legacyDeepSeekKey = try CueAPIKeyStore.loadAPIKey(for: .deepSeek)
         expect(
-            versionOneDeepSeekKey == "fixture-key",
-            "schema v1 DeepSeek key remains readable before migration"
+            legacyDeepSeekKey == "fixture-key",
+            "legacy DeepSeek key remains readable without a schema version"
         )
         try CueAPIKeyStore.saveAPIKey("openai-key", for: .openAI)
         let migrated = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
         let migratedKeys = migrated?["providerAPIKeys"] as? [String: Any]
-        expect(migrated?["schemaVersion"] as? Int == 2, "API key config migrates to schema v2")
-        expect(migrated?["deepSeekAPIKey"] as? String == "fixture-key", "migration preserves the legacy key")
-        expect(migratedKeys?["deepseek"] as? String == "fixture-key", "migration copies the DeepSeek key")
+        expect(migrated?["schemaVersion"] == nil, "API key config does not write a schema version")
+        expect(migrated?["deepSeekAPIKey"] == nil, "legacy DeepSeek field is removed after migration")
+        expect(migratedKeys?["deepseek"] as? String == "fixture-key", "legacy DeepSeek key is normalized")
         expect(migratedKeys?["openai"] as? String == "openai-key", "provider keys are stored independently")
-        expect(
-            migrated?["futureField"] as? String == "must-survive-a-supported-write",
-            "API key migration preserves unknown fields"
-        )
-        let backupURL = directory.appendingPathComponent("config.v1.backup.json")
-        let backupData = try Data(contentsOf: backupURL)
-        expect(backupData == versionOneData, "migration keeps an exact version-one backup")
 
-        try fixtureData(named: "config-v2.json").write(to: url)
-        let versionTwoOpenAIKey = try CueAPIKeyStore.loadAPIKey(for: .openAI)
-        let versionTwoDeepSeekKey = try CueAPIKeyStore.loadAPIKey(for: .deepSeek)
-        expect(versionTwoOpenAIKey == "openai-v2-key", "schema v2 fixture is readable")
-        expect(versionTwoDeepSeekKey == "deepseek-v2-key", "v2 provider key wins")
+        try fixtureData(named: "config-provider-keys.json").write(to: url)
+        let storedOpenAIKey = try CueAPIKeyStore.loadAPIKey(for: .openAI)
+        let storedDeepSeekKey = try CueAPIKeyStore.loadAPIKey(for: .deepSeek)
+        expect(storedOpenAIKey == "openai-key", "provider key config is readable")
+        expect(storedDeepSeekKey == "deepseek-key", "DeepSeek provider key is readable")
         try CueAPIKeyStore.saveAPIKey("anthropic-key", for: .anthropic)
         try CueAPIKeyStore.removeAPIKey(for: .deepSeek)
         let updated = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
         let updatedKeys = updated?["providerAPIKeys"] as? [String: Any]
-        expect(updatedKeys?["deepseek"] == nil, "removing a provider key only removes its v2 entry")
-        expect(updatedKeys?["openai"] as? String == "openai-v2-key", "removing one key preserves other providers")
-        expect(updatedKeys?["anthropic"] as? String == "anthropic-key", "new providers persist in schema v2")
-        expect(updated?["deepSeekAPIKey"] as? String == "legacy-copy-must-survive", "v2 writes preserve legacy source data")
+        expect(updatedKeys?["deepseek"] == nil, "removing a provider key removes its entry")
+        expect(updatedKeys?["openai"] as? String == "openai-key", "removing one key preserves other providers")
+        expect(updatedKeys?["anthropic"] as? String == "anthropic-key", "new providers persist in the config")
+        expect(updated?["schemaVersion"] == nil, "provider key writes remain unversioned")
         let removedDeepSeekKey = try CueAPIKeyStore.loadAPIKey(for: .deepSeek)
-        expect(removedDeepSeekKey == nil, "a removed v2 DeepSeek key is not revived")
+        expect(removedDeepSeekKey == nil, "a removed DeepSeek key is not revived")
         expect(
             updated?["futureField"] as? String == "must-survive-a-supported-write",
-            "schema v2 writes preserve unknown fields"
+            "config writes preserve unrelated fields"
         )
 
-        let futureData = try fixtureData(named: "config-future.json")
-        try futureData.write(to: url)
-        let futureAnthropicKey = try CueAPIKeyStore.loadAPIKey(for: .anthropic)
-        expect(
-            futureAnthropicKey == "future-anthropic-key",
-            "future schema known provider keys remain readable"
-        )
-        expectThrows(
-            try CueAPIKeyStore.saveAPIKey("must-not-write", for: .anthropic),
-            "API key writes reject future schemas"
-        )
-        expectThrows(
-            try CueAPIKeyStore.removeAPIKey(for: .anthropic),
-            "API key removal rejects future schemas"
-        )
-        let unchangedFutureData = try Data(contentsOf: url)
-        expect(unchangedFutureData == futureData, "future API key config remains unchanged")
-
-        for fixture in ["config-corrupt.json", "config-v2-corrupt-provider-keys.json"] {
+        for fixture in ["config-corrupt.json", "config-corrupt-provider-keys.json"] {
             let corruptData = try fixtureData(named: fixture)
             try corruptData.write(to: url)
             expectThrows(
@@ -741,7 +735,7 @@ private func runAppTests() async {
             expect(unchangedCorruptData == corruptData, "\(fixture) remains unchanged")
         }
 
-        try fixtureData(named: "config-v2.json").write(to: url)
+        try fixtureData(named: "config-provider-keys.json").write(to: url)
         let originalEnvironmentKey = getenv("OPENAI_API_KEY").map { String(cString: $0) }
         defer {
             if let originalEnvironmentKey {
@@ -753,7 +747,7 @@ private func runAppTests() async {
         setenv("OPENAI_API_KEY", "environment-openai-key", 1)
         let storedKey = try CueAPIKeyStore.loadAPIKey(for: .openAI)
         let storedSource = try CueAPIKeyStore.source(for: .openAI)
-        expect(storedKey == "openai-v2-key", "stored API key ignores provider environment variables")
+        expect(storedKey == "openai-key", "stored API key ignores provider environment variables")
         expect(storedSource == .configuration, "stored credential is the only source")
         try CueAPIKeyStore.removeAPIKey(for: .openAI)
         let removedKey = try CueAPIKeyStore.loadAPIKey(for: .openAI)
@@ -782,7 +776,7 @@ private func runAppTests() async {
         defer { try? FileManager.default.removeItem(at: directory) }
         CueAPIKeyStore.configurationURLOverride = url
         defer { CueAPIKeyStore.configurationURLOverride = nil }
-        try fixtureData(named: "config-v2.json").write(to: url)
+        try fixtureData(named: "config-provider-keys.json").write(to: url)
 
         let settings = CueSettings(defaults: defaults, aiProviderService: StubAIProviderService())
         expect(
@@ -811,7 +805,7 @@ private func runAppTests() async {
         expect(!settings.providerCredentialConfigured, "active provider state refreshes after removal")
         let remaining = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
         let keys = remaining?["providerAPIKeys"] as? [String: Any]
-        expect(keys?["deepseek"] as? String == "deepseek-v2-key", "removals preserve unrelated provider keys")
+        expect(keys?["deepseek"] as? String == "deepseek-key", "removals preserve unrelated provider keys")
         expect(keys?["openai"] == nil, "active provider key is removed from the document")
     } catch {
         expect(false, "provider credential management tests should not throw: \(error)")

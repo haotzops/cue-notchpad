@@ -45,7 +45,7 @@ body:
     attributes:
       label: 运行环境
       description: macOS 版本、芯片架构，以及是否运行过其他 Cue 实例。
-      placeholder: macOS 15.0，Apple Silicon
+      placeholder: macOS 26.0，Apple Silicon
     validations:
       required: true
   - type: textarea

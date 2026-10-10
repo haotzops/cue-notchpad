@@ -21,6 +21,9 @@ grep -q 'postflight_steps do' "$RENDERED_CASK"
 ! grep -q 'postflight do' "$RENDERED_CASK"
 grep -q 'if_path_exists "{{appdir}}/Cue Notchpad.app" do' "$RENDERED_CASK"
 grep -q 'run "/usr/bin/xattr"' "$RENDERED_CASK"
+grep -q 'depends_on macos: :tahoe' "$RENDERED_CASK"
+grep -q 'swift-tools-version: 6.2' Package.swift
+grep -q 'platforms: \[.macOS(.v26)\]' Package.swift
 
 python3 - <<'PY'
 import json
@@ -29,20 +32,17 @@ from pathlib import Path
 compile(Path("Scripts/generate-tokenizer-index.py").read_text(), "generate-tokenizer-index.py", "exec")
 
 fixtures = Path("Tests/Fixtures/Persistence")
-for name, version in (("config-v1.json", 1), ("config-v2.json", 2), ("usage-v1.json", 1)):
-    document = json.loads((fixtures / name).read_text())
-    assert document["schemaVersion"] == version, name
+legacy_config = json.loads((fixtures / "config-legacy.json").read_text())
+provider_keys_config = json.loads((fixtures / "config-provider-keys.json").read_text())
+assert "schemaVersion" not in legacy_config
+assert "schemaVersion" not in provider_keys_config
+assert isinstance(provider_keys_config["providerAPIKeys"], dict)
 
-future_usage = json.loads((fixtures / "usage-future.json").read_text())
-future_config = json.loads((fixtures / "config-future.json").read_text())
 provider_profiles = json.loads((fixtures / "provider-profiles-v1.json").read_text())
-corrupt_v2 = json.loads((fixtures / "config-v2-corrupt-provider-keys.json").read_text())
-assert future_usage["schemaVersion"] > 1
-assert future_config["schemaVersion"] > 2
+corrupt_provider_keys = json.loads((fixtures / "config-corrupt-provider-keys.json").read_text())
 assert provider_profiles["schemaVersion"] == 1
 assert provider_profiles["activeProfileID"] in {profile["id"] for profile in provider_profiles["profiles"]}
-assert corrupt_v2["schemaVersion"] == 2
-assert not isinstance(corrupt_v2["providerAPIKeys"], dict)
+assert not isinstance(corrupt_provider_keys["providerAPIKeys"], dict)
 
 for name in ("config-corrupt.json", "usage-corrupt.json"):
     try:
@@ -58,5 +58,6 @@ plutil -lint Sources/CueCore/Resources/en.lproj/Localizable.strings
 plutil -lint Sources/CueCore/Resources/zh-Hans.lproj/Localizable.strings
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Supporting/Info.plist)" == \
     "io.github.haotzops.cue-notchpad" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Supporting/Info.plist)" == "26.0" ]]
 
 printf 'Source metadata and scripts are valid.\n'

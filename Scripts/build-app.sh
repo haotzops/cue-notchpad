@@ -10,7 +10,7 @@ PLIST_BUDDY="/usr/libexec/PlistBuddy"
 RELEASE_VERSION="${RELEASE_VERSION:-$($PLIST_BUDDY -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")}"
 BUILD_NUMBER="${BUILD_NUMBER:-$($PLIST_BUDDY -c 'Print :CFBundleVersion' "$INFO_PLIST")}"
 ARCHS="${ARCHS:-arm64}"
-MINIMUM_MACOS_VERSION="${MINIMUM_MACOS_VERSION:-13.0}"
+MINIMUM_MACOS_VERSION="26.0"
 SOURCE_REVISION="${SOURCE_REVISION:-$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || printf 'unknown')}"
 SOURCE_DIRTY=false
 if [[ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no 2>/dev/null || true)" ]]; then
@@ -84,7 +84,7 @@ else
 fi
 
 # A recent SDK in LC_BUILD_VERSION is required for native system appearance on
-# newer macOS; a deployment target of 13 must not change this metadata.
+# Keep the binary deployment target aligned with the package and app bundle baseline.
 python3 - "$APP/Contents/MacOS/cue-host" "$MINIMUM_MACOS_VERSION" "$SDKROOT" <<'PY'
 import json
 from pathlib import Path

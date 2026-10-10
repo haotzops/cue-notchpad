@@ -123,7 +123,7 @@ ${message}
 
 ## 从源码构建
 
-要求 macOS 13+、Swift 6、Node.js 22+ 和完整的 Xcode 工具链。仅安装 Xcode Command Line Tools 不足以构建当前版本：SwiftUI 的 `@State` 在较新的 macOS SDK 中依赖 Xcode 提供的 `SwiftUIMacros` 编译器插件。
+要求 macOS 26+、Swift 6.2、Node.js 22+ 和完整的 Xcode 工具链。仅安装 Xcode Command Line Tools 不足以构建当前版本：SwiftUI 的 `@State` 在较新的 macOS SDK 中依赖 Xcode 提供的 `SwiftUIMacros` 编译器插件。
 
 安装 Xcode 后，选择其 Developer 目录并完成首次初始化（如果 Xcode 安装在其他位置，请相应调整路径）：
 

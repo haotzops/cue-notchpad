@@ -64,6 +64,8 @@ cmp "$PROVENANCE" "$APP/Contents/Resources/BuildInfo.json"
     "$VERSION" ]]
 [[ "$($PLIST_BUDDY -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")" == \
     "$BUILD_NUMBER" ]]
+[[ "$($PLIST_BUDDY -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist")" == \
+    "26.0" ]]
 
 python3 - "$PROVENANCE" "$VERSION" "$BUILD_NUMBER" <<'PY'
 import json
@@ -76,6 +78,7 @@ assert document["version"] == sys.argv[2]
 assert document["buildNumber"] == int(sys.argv[3])
 assert document["configuration"] == "release"
 assert document["architectures"] == ["arm64"]
+assert document["minimumMacOSVersion"] == "26.0"
 PY
 
 for executable in cue cue-host; do

@@ -1,0 +1,10 @@
+{
+  "providerAPIKeys": {
+    "deepseek": "deepseek-key",
+    "openai": "openai-key",
+    "minimax-cn": "minimax-plan-key",
+    "groq": "groq-key",
+    "siliconflow": "siliconflow-key"
+  },
+  "futureField": "must-survive-a-supported-write"
+}

@@ -6,7 +6,6 @@ struct CueProviderSettingsView: View {
     @Binding var providerAPIKey: String
     @State private var isConfirmingProfileRemoval = false
     @State private var isConfirmingCredentialRemoval = false
-    @State private var showAdvanced = false
 
     private let customAPIs: [CueAIAPI] = [
         .openAICompletions,
@@ -203,53 +202,44 @@ struct CueProviderSettingsView: View {
             }
 
             if !settings.activeProviderProfile.isCustom {
-                Section {
-                    DisclosureGroup(
-                        settings.localized(.settingsAdvanced),
-                        isExpanded: $showAdvanced
-                    ) {
-                        advancedConfiguration
-                    }
+                Section(settings.localized(.settingsAdvanced)) {
+                    advancedConfiguration
                 }
             }
         }
         .cueSettingsFormAppearance()
-        .onChange(of: settings.activeProviderProfileID) { _ in
+        .onChange(of: settings.activeProviderProfileID) { _, _ in
             providerAPIKey = ""
-            showAdvanced = false
         }
     }
 
+    @ViewBuilder
     private var advancedConfiguration: some View {
-        Group {
-            if !settings.activeProviderProfile.isCustom {
-                TextField(
-                    settings.localized(.settingsProviderBaseURL),
-                    text: profileBinding(\.baseURL)
-                )
-            }
+        TextField(
+            settings.localized(.settingsProviderBaseURL),
+            text: profileBinding(\.baseURL)
+        )
 
-            let resolution = settings.activeEndpointResolution
-            if resolution.isKnown {
-                CueSettingsStatusLabel(
-                    text: settings.localized(.settingsProviderEndpointsDetected),
-                    color: .secondary,
-                    systemImage: "checkmark.circle"
-                )
-            } else {
-                TextField(
-                    settings.localized(.settingsProviderModelsURL),
-                    text: optionalProfileBinding(\.manualModelsURL)
-                )
-                TextField(
-                    settings.localized(.settingsProviderBalanceURL),
-                    text: optionalProfileBinding(\.manualBalanceURL)
-                )
-                TextField(
-                    settings.localized(.settingsProviderBalancePath),
-                    text: profileBinding(\.balanceJSONPointer)
-                )
-            }
+        let resolution = settings.activeEndpointResolution
+        if resolution.isKnown {
+            CueSettingsStatusLabel(
+                text: settings.localized(.settingsProviderEndpointsDetected),
+                color: .secondary,
+                systemImage: "checkmark.circle"
+            )
+        } else {
+            TextField(
+                settings.localized(.settingsProviderModelsURL),
+                text: optionalProfileBinding(\.manualModelsURL)
+            )
+            TextField(
+                settings.localized(.settingsProviderBalanceURL),
+                text: optionalProfileBinding(\.manualBalanceURL)
+            )
+            TextField(
+                settings.localized(.settingsProviderBalancePath),
+                text: profileBinding(\.balanceJSONPointer)
+            )
         }
     }
 

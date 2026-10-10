@@ -16,7 +16,14 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 
 - 内置 AI provider 收敛为 DeepSeek、OpenAI 和 Anthropic；其他服务通过自定义 API profile 接入。
 - API Key 改为按 profile 保存在本地配置文件，不再从环境变量读取供应商凭据。
+- `config.json` 改为无 `schemaVersion` 的 provider key 格式，并兼容旧版 DeepSeek 配置自动规范化。
+- 最低系统要求提升至 macOS 26+，设置界面移除旧系统兼容分支。
 - 构建脚本补充 SDK metadata 校验和 SwiftPM 资源 bundle 兼容处理。
+
+### 修复
+
+- 修复 DeepSeek 余额接口返回字符串金额时无法解析的问题，并读取正确的货币字段。
+- 设置中的高级 Provider endpoint 配置改为直接展开，减少不必要的点击。
 
 ## [0.4.1] - 2026-10-08
 

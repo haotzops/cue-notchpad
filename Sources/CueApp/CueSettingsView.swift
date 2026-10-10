@@ -31,31 +31,7 @@ struct CueSettingsView: View {
     @ObservedObject var settings: CueSettings
 
     var body: some View {
-        if #available(macOS 26.0, *) {
-            CueModernSettingsView(settings: settings)
-        } else {
-            CueLegacySettingsView(settings: settings)
-        }
-    }
-}
-
-struct CueLegacySettingsView: View {
-    @ObservedObject var settings: CueSettings
-
-    var body: some View {
         CueSettingsNavigation(settings: settings)
-            .navigationSplitViewStyle(.balanced)
-    }
-}
-
-@available(macOS 26.0, *)
-struct CueModernSettingsView: View {
-    @ObservedObject var settings: CueSettings
-
-    var body: some View {
-        // Let the system own sidebar material, toolbar treatment and column behavior.
-        CueSettingsNavigation(settings: settings)
-            .navigationSplitViewStyle(.automatic)
     }
 }
 
@@ -77,6 +53,7 @@ private struct CueSettingsNavigation: View {
                 .navigationTitle(settings.localized((page ?? .general).titleKey))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .navigationSplitViewStyle(.automatic)
     }
 
     @ViewBuilder

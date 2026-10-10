@@ -29,14 +29,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.setContentSize(Self.defaultContentSize)
         window.contentMinSize = Self.minimumContentSize
         window.isReleasedWhenClosed = false
-        if #available(macOS 26.0, *) {
-            window.styleMask.insert(.fullSizeContentView)
-            window.titlebarAppearsTransparent = true
-            window.toolbarStyle = .automatic
-        } else {
-            window.toolbarStyle = .unified
-            window.titlebarSeparatorStyle = .line
-        }
+        window.styleMask.insert(.fullSizeContentView)
+        window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .automatic
         window.animationBehavior = .documentWindow
 
         super.init(window: window)

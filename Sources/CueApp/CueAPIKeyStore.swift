@@ -4,13 +4,10 @@ import Foundation
 /// Resolves provider credentials from the user-owned local configuration file.
 /// The file remains at the stable Cue path and is restricted to the current user (0600).
 enum CueAPIKeyStoreError: LocalizedError {
-    case unsupportedSchema
     case corruptConfiguration
 
     var errorDescription: String? {
         switch self {
-        case .unsupportedSchema:
-            "This configuration was created by a newer version of Cue."
         case .corruptConfiguration:
             "The Cue configuration is corrupt and was left unchanged."
         }
@@ -22,7 +19,6 @@ enum CueAPIKeySource: Equatable {
 }
 
 enum CueAPIKeyStore {
-    static let currentSchemaVersion = 2
     /// Test-only override; production uses the stable Application Support path.
     static var configurationURLOverride: URL?
 
@@ -31,10 +27,6 @@ enum CueAPIKeyStore {
         let directory = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Cue Notchpad", isDirectory: true)
         return directory.appendingPathComponent("config.json")
-    }
-
-    private static var versionOneBackupURL: URL {
-        fileURL.deletingLastPathComponent().appendingPathComponent("config.v1.backup.json")
     }
 
     static func loadAPIKey(for provider: CueAIProviderID) throws -> String? {
@@ -46,26 +38,11 @@ enum CueAPIKeyStore {
     }
 
     static func hasStoredAPIKey(for provider: CueAIProviderID) throws -> Bool {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return false }
-        let document = try configuration(at: fileURL)
-        if let keys = try providerKeys(in: document),
-           let key = keys[provider.rawValue] as? String,
-           !key.isEmpty
-        {
-            return true
-        }
-        let version = document["schemaVersion"] as? Int ?? 0
-        return version < currentSchemaVersion
-            && provider == .deepSeek
-            && (document["deepSeekAPIKey"] as? String)?.isEmpty == false
+        try loadAPIKey(for: provider) != nil
     }
 
     static func saveAPIKey(_ key: String, for provider: CueAIProviderID) throws {
-        var document = try writableConfiguration()
-        var keys = try providerKeys(in: document) ?? [:]
-        keys[provider.rawValue] = key
-        document["providerAPIKeys"] = keys
-        try persist(document)
+        try saveAPIKey(key, forProfileID: provider.rawValue)
     }
 
     static func removeAPIKey(for provider: CueAIProviderID) throws {
@@ -81,12 +58,7 @@ enum CueAPIKeyStore {
     }
 
     static func hasStoredAPIKey(forProfileID profileID: String) throws -> Bool {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return false }
-        let document = try configuration(at: fileURL)
-        guard let keys = try providerKeys(in: document),
-              let key = keys[profileID] as? String
-        else { return false }
-        return !key.isEmpty
+        try loadAPIKey(forProfileID: profileID) != nil
     }
 
     static func saveAPIKey(_ key: String, forProfileID profileID: String) throws {
@@ -124,11 +96,8 @@ enum CueAPIKeyStore {
         {
             return (key, .configuration)
         }
-        // The legacy field remains readable only for the existing provider API.
-        let version = document["schemaVersion"] as? Int ?? 0
-        if version < currentSchemaVersion,
-           legacyProvider == .deepSeek,
-           let key = document["deepSeekAPIKey"] as? String,
+        if legacyProvider == .deepSeek,
+           let key = try legacyDeepSeekKey(in: document),
            !key.isEmpty
         {
             return (key, .configuration)
@@ -140,55 +109,20 @@ enum CueAPIKeyStore {
         let directory = fileURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            return ["schemaVersion": currentSchemaVersion, "providerAPIKeys": [:]]
+            return ["providerAPIKeys": [:]]
         }
-        let sourceData = try Data(contentsOf: fileURL)
-        var document = try configuration(from: sourceData)
-        let storedVersion = document["schemaVersion"] as? Int ?? 0
-        guard storedVersion <= currentSchemaVersion else {
-            throw CueAPIKeyStoreError.unsupportedSchema
-        }
-        if storedVersion < currentSchemaVersion {
-            try migrateVersionOne(&document, sourceData: sourceData)
-        } else {
-            _ = try providerKeys(in: document)
-        }
-        return document
-    }
 
-    private static func migrateVersionOne(
-        _ document: inout [String: Any],
-        sourceData: Data
-    ) throws {
-        guard (document["schemaVersion"] as? Int ?? 0) == 1 else {
-            throw CueAPIKeyStoreError.corruptConfiguration
-        }
-        if !FileManager.default.fileExists(atPath: versionOneBackupURL.path) {
-            let temporaryURL = versionOneBackupURL
-                .deletingLastPathComponent()
-                .appendingPathComponent(".config.v1.backup.\(UUID().uuidString).tmp")
-            defer { try? FileManager.default.removeItem(at: temporaryURL) }
-            try sourceData.write(to: temporaryURL, options: .atomic)
-            try FileManager.default.setAttributes(
-                [.posixPermissions: 0o600],
-                ofItemAtPath: temporaryURL.path
-            )
-            do {
-                // Publishing a hard link is atomic and refuses to overwrite a
-                // backup another Cue process may have created concurrently.
-                try FileManager.default.linkItem(at: temporaryURL, to: versionOneBackupURL)
-            } catch CocoaError.fileWriteFileExists {
-                // Another process completed the same idempotent migration.
-            }
-        }
+        var document = try configuration(at: fileURL)
         var keys = try providerKeys(in: document) ?? [:]
-        if keys[CueAIProviderID.deepSeek.rawValue] == nil,
-           let legacyKey = document["deepSeekAPIKey"] as? String
+        if let legacyKey = try legacyDeepSeekKey(in: document),
+           keys[CueAIProviderID.deepSeek.rawValue] == nil
         {
             keys[CueAIProviderID.deepSeek.rawValue] = legacyKey
         }
         document["providerAPIKeys"] = keys
-        document["schemaVersion"] = currentSchemaVersion
+        document.removeValue(forKey: "deepSeekAPIKey")
+        document.removeValue(forKey: "schemaVersion")
+        return document
     }
 
     private static func providerKeys(in document: [String: Any]) throws -> [String: Any]? {
@@ -197,6 +131,14 @@ enum CueAPIKeyStore {
             throw CueAPIKeyStoreError.corruptConfiguration
         }
         return keys
+    }
+
+    private static func legacyDeepSeekKey(in document: [String: Any]) throws -> String? {
+        guard let value = document["deepSeekAPIKey"] else { return nil }
+        guard let key = value as? String else {
+            throw CueAPIKeyStoreError.corruptConfiguration
+        }
+        return key
     }
 
     private static func persist(_ document: [String: Any]) throws {
@@ -219,9 +161,7 @@ enum CueAPIKeyStore {
         } catch {
             throw CueAPIKeyStoreError.corruptConfiguration
         }
-        guard let document = object as? [String: Any],
-              document["schemaVersion"] is Int
-        else {
+        guard let document = object as? [String: Any] else {
             throw CueAPIKeyStoreError.corruptConfiguration
         }
         return document
