@@ -3,20 +3,33 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RENDERED_CASK="$(mktemp "${TMPDIR:-/tmp}/cue-notchpad-cask.XXXXXX")"
+FAKE_PGREP="$(mktemp "${TMPDIR:-/tmp}/cue-notchpad-pgrep.XXXXXX")"
 cleanup() {
-    rm -f "$RENDERED_CASK"
+    rm -f "$RENDERED_CASK" "$FAKE_PGREP"
 }
 trap cleanup EXIT
 
 cd "$ROOT"
 
 bash -n Scripts/*.sh
+cat > "$FAKE_PGREP" <<'EOF'
+#!/bin/sh
+exit "${CUE_PGREP_EXIT:-1}"
+EOF
+chmod +x "$FAKE_PGREP"
+CUE_PGREP="$FAKE_PGREP" CUE_PGREP_EXIT=1 ./Scripts/ensure-cue-not-running.sh
+if CUE_PGREP="$FAKE_PGREP" CUE_PGREP_EXIT=0 ./Scripts/ensure-cue-not-running.sh; then
+    printf 'ensure-cue-not-running.sh failed to block an active host.\n' >&2
+    exit 1
+fi
 ./Scripts/render-homebrew-cask.sh \
     0.0.0 0000000000000000000000000000000000000000000000000000000000000000 \
     "$RENDERED_CASK"
 ruby -c "$RENDERED_CASK"
 grep -q 'version "0.0.0"' "$RENDERED_CASK"
 grep -q 'sha256 "0000000000000000000000000000000000000000000000000000000000000000"' "$RENDERED_CASK"
+grep -q 'preflight do' "$RENDERED_CASK"
+grep -q '"/usr/bin/pgrep"' "$RENDERED_CASK"
 grep -q 'postflight_steps do' "$RENDERED_CASK"
 ! grep -q 'postflight do' "$RENDERED_CASK"
 grep -q 'if_path_exists "{{appdir}}/Cue Notchpad.app" do' "$RENDERED_CASK"

@@ -29,6 +29,11 @@ else
     "$ROOT/Scripts/build-app.sh"
 fi
 
+# Refuse to replace the bundle while cue-host owns an active editing transaction.
+# The check is deliberately immediately before the replacement to avoid losing a
+# session that started while a build or archive extraction was running.
+"$ROOT/Scripts/ensure-cue-not-running.sh"
+
 mkdir -p "$APP_DIR" "$BIN_DIR"
 # Keep the application directory in place. Removing and recreating a bundle can
 # make Launch Services treat it as a new installation and is unnecessary for an

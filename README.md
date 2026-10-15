@@ -23,6 +23,8 @@ brew upgrade --cask cue-notchpad
 brew uninstall --cask cue-notchpad
 ```
 
+如果 Cue 正在等待编辑会话，升级会主动中止，以避免替换正在运行的 `cue-host`；请先提交或取消编辑，再重新执行升级。
+
 ### GitHub Release
 
 1. 从 [GitHub Releases](https://github.com/haotzops/cue-notchpad/releases) 下载 `Cue-Notchpad-<版本>-macOS-arm64.zip`、`SHA256SUMS` 和 `PROVENANCE.json`。
@@ -193,6 +195,8 @@ export PATH="$HOME/.local/bin:$PATH"
 
 - `~/Applications/Cue Notchpad.app`
 - `~/.local/bin/cue`
+
+如果 Cue 正在等待编辑会话，安装会主动中止，以避免覆盖正在运行的 `cue-host`；请先提交或取消编辑，再重新执行安装。
 
 也可以安装到系统目录：
 
