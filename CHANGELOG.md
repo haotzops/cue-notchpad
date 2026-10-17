@@ -7,6 +7,10 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 
 ## [未发布]
 
+### 修复
+
+- 更新 Homebrew Cask 安装提示，改为引导用户在 coding agent 设置文件中将 `externalEditor` 配置为 `cue --wait`。
+
 ## [0.5.0] - 2026-10-15
 
 ### 新增

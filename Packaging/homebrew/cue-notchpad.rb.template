@@ -33,7 +33,7 @@ cask "cue-notchpad" do
   end
 
   caveats <<~EOS
-    Cue Notchpad #{version} 使用 ad-hoc 签名，未经过 Apple 公证。
-    Homebrew 安装完成后会自动移除该 app 的 quarantine 属性。
+    Set the editor in your coding agent's settings file to:
+      "externalEditor": "cue --wait"
   EOS
 end
