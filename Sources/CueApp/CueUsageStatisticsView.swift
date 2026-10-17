@@ -2,9 +2,17 @@ import CueCore
 import SwiftUI
 
 private enum CueUsagePeriod: String, CaseIterable, Identifiable {
-    case day, week, month, custom
+    case day, week, month
 
     var id: String { rawValue }
+
+    var maximumDailyBuckets: Int {
+        switch self {
+        case .day: 30
+        case .week: 7
+        case .month: 31
+        }
+    }
 }
 
 private struct CueUsageSelection {
@@ -16,12 +24,7 @@ struct CueUsageStatisticsView: View {
     @ObservedObject var settings: CueSettings
     @ObservedObject var usage = CueUsageStore.shared
     @State private var period: CueUsagePeriod = .week
-    @State private var customStart = Calendar.current.date(
-        byAdding: .day,
-        value: -29,
-        to: Calendar.current.startOfDay(for: .now)
-    ) ?? .now
-    @State private var customEnd = Date.now
+    @State private var periodOffset = 0
     @State private var isConfirmingUsageClear = false
 
     private var selection: CueUsageSelection {
@@ -31,32 +34,38 @@ struct CueUsageStatisticsView: View {
         case .day:
             return CueUsageSelection(start: today, end: .now)
         case .week:
-            return CueUsageSelection(
-                start: calendar.date(byAdding: .day, value: -6, to: today) ?? today,
-                end: .now
-            )
+            return calendarSelection(of: .weekOfYear, calendar: calendar)
         case .month:
-            return CueUsageSelection(
-                start: calendar.date(byAdding: .day, value: -29, to: today) ?? today,
-                end: .now
-            )
-        case .custom:
-            let firstDay = calendar.startOfDay(for: min(customStart, customEnd))
-            let lastDay = calendar.startOfDay(for: max(customStart, customEnd))
-            let endOfLastDay = calendar.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay
-            return CueUsageSelection(start: firstDay, end: min(.now, endOfLastDay))
+            return calendarSelection(of: .month, calendar: calendar)
         }
     }
 
     private var activity: CueUsageActivity {
-        usage.activity(from: selection.start, through: selection.end)
+        usage.activity(
+            from: selection.start,
+            through: selection.end,
+            maximumBuckets: period.maximumDailyBuckets
+        )
+    }
+
+    private func calendarSelection(
+        of component: Calendar.Component,
+        calendar: Calendar
+    ) -> CueUsageSelection {
+        guard let anchor = calendar.date(byAdding: component, value: periodOffset, to: .now),
+              let interval = calendar.dateInterval(of: component, for: anchor)
+        else {
+            return CueUsageSelection(start: calendar.startOfDay(for: .now), end: .now)
+        }
+        let lastMoment = interval.end.addingTimeInterval(-0.001)
+        return CueUsageSelection(start: interval.start, end: min(.now, lastMoment))
     }
 
     var body: some View {
         let selectedActivity = activity
         Form {
             Section {
-                periodControls
+                periodControls(selectedActivity)
             }
 
             Section {
@@ -78,34 +87,44 @@ struct CueUsageStatisticsView: View {
         .cueSettingsFormAppearance()
     }
 
-    private var periodControls: some View {
+    private func periodControls(_ selectedActivity: CueUsageActivity) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Picker(localized(.usageActivity), selection: $period) {
                 Text(localized(.usageToday)).tag(CueUsagePeriod.day)
                 Text(localized(.usageWeek)).tag(CueUsagePeriod.week)
                 Text(localized(.usageMonth)).tag(CueUsagePeriod.month)
-                Text(localized(.usageCustom)).tag(CueUsagePeriod.custom)
             }
             .labelsHidden()
             .pickerStyle(.segmented)
             .frame(maxWidth: .infinity)
+            .onChange(of: period) { _, _ in
+                periodOffset = 0
+            }
 
-            if period == .custom {
-                VStack(alignment: .leading, spacing: 8) {
-                    DatePicker(
-                        localized(.usageStart),
-                        selection: $customStart,
-                        in: ...Date.now,
-                        displayedComponents: .date
-                    )
-                    DatePicker(
-                        localized(.usageEnd),
-                        selection: $customEnd,
-                        in: ...Date.now,
-                        displayedComponents: .date
-                    )
+            if period != .day {
+                HStack(spacing: 12) {
+                    Button {
+                        periodOffset -= 1
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(localized(.usagePreviousPeriod))
+
+                    Text(selectedActivity.rangeLabel(locale: locale))
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
+
+                    Button {
+                        periodOffset += 1
+                    } label: {
+                        Image(systemName: "chevron.right")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(periodOffset >= 0)
+                    .accessibilityLabel(localized(.usageNextPeriod))
                 }
-                .datePickerStyle(.compact)
+                .controlSize(.small)
             }
         }
     }

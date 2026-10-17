@@ -15,6 +15,8 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 ### 变更
 
 - 安装或升级前检测活动中的 `cue-host` 编辑会话；会话未完成时中止更新，避免覆盖正在运行的编辑器进程。
+- 使用统计改为按天、按周和按月查看，并支持在周/月周期之间前后切换；移除自定义日期范围。
+- 修复历史周/月统计将多个日期合并为单根柱的问题；完整周期按每天显示，当前周期仅显示截至今天的数据。
 - 内置 AI provider 收敛为 DeepSeek、OpenAI 和 Anthropic；其他服务通过自定义 API profile 接入。
 - API Key 改为按 profile 保存在本地配置文件，不再从环境变量读取供应商凭据。
 - `config.json` 改为无 `schemaVersion` 的 provider key 格式，并兼容旧版 DeepSeek 配置自动规范化。

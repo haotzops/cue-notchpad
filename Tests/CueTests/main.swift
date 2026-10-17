@@ -878,6 +878,13 @@ private func runAppTests() async {
         expect(activity.dayCount == 3, "usage activity includes both boundary days")
         expect(activity.averageOpens == 1, "usage activity averages over selected days")
         expect(activity.buckets.map(\.opens) == [2, 1, 0], "multi-day activity uses daily buckets")
+        let completeMonthActivity = activityStore.activity(
+            from: activityStart,
+            through: activityStart.addingTimeInterval(30 * 86_400),
+            calendar: utcCalendar,
+            maximumBuckets: 31
+        )
+        expect(completeMonthActivity.buckets.count == 31, "month activity preserves one bucket per day")
         let hourlyActivity = activityStore.activity(
             from: activityStart,
             through: activityStart.addingTimeInterval(3 * 3_600),

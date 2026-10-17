@@ -131,11 +131,10 @@
 "settings.ai_rewrite.provider_format" = "AI 重写 · %@";
 "settings.ai_rewrite.default_prompt" = "在不改变原意的前提下，重写并扩写以下 prompt；只输出最终 prompt，不要解释。";
 "usage.today" = "今日";
-"usage.week" = "近 7 天";
-"usage.month" = "近 30 天";
-"usage.custom" = "自定义";
-"usage.start" = "开始";
-"usage.end" = "结束";
+"usage.week" = "按周统计";
+"usage.month" = "按月统计";
+"usage.previous_period" = "上一个周期";
+"usage.next_period" = "下一个周期";
 "usage.cue_opens" = "打开次数";
 "usage.first_open" = "首次打开";
 "usage.latest_open" = "最近打开";
