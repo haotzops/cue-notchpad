@@ -10,11 +10,15 @@ Cue Notchpad 只做一件事，替代你的 `code --wait`/`cot --wait` 作为外
 
 ### Homebrew
 
+由于这是第三方 Tap，Homebrew 需要显式信任 Cask。下面的命令只信任 Cue Notchpad，不会信任整个 Tap：
+
 ```bash
-brew install --cask haotzops/tap/cue-notchpad
+brew tap haotzops/tap
+brew trust --cask haotzops/tap/cue-notchpad
+brew install --cask cue-notchpad
 ```
 
-该命令会同时安装 `Cue Notchpad.app` 和 `cue` 命令。项目使用 ad-hoc 签名，未经过 Apple 公证；Homebrew 安装完成后会自动移除该 app 的 quarantine 属性，从而避免首次启动时被 Gatekeeper 阻止。请仅在确认 Tap 和下载来源可信后安装。
+该命令会同时安装 `Cue Notchpad.app` 和 `cue` 命令。
 
 升级或卸载：
 
