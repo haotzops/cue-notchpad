@@ -7,6 +7,8 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 
 ## [未发布]
 
+## [0.5.0] - 2026-10-15
+
 ### 新增
 
 - 新增多 Provider 配置 profile、自定义 API 配置、模型 endpoint 管理和可配置的余额检测。
@@ -124,6 +126,7 @@ Cue Notchpad 的重要变更都会记录在此文件中。
 - 使用本地 `cl100k_base` 词表计算 token，不发送网络请求。
 - 添加 Cue Notchpad 应用图标。
 
+[0.5.0]: https://github.com/haotzops/cue-notchpad/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/haotzops/cue-notchpad/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/haotzops/cue-notchpad/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/haotzops/cue-notchpad/compare/v0.3.0...v0.3.1
